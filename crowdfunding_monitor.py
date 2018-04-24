@@ -1,5 +1,5 @@
 from urllib import request, parse
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup
 from pymongo import MongoClient
 import datetime
 import ssl
@@ -13,7 +13,7 @@ context = ssl._create_unverified_context()  # 不验证网页安全性
 class Single_proj_craw:
 
     def __init__(self, p_id, category, end_time):
-        self.User_Agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:59.0) Gecko/20100101 Firefox/59.0'
+        self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.p_id = p_id
         self.category = category  # 预热中、众筹中、众筹成功、项目成功
@@ -55,7 +55,7 @@ class Single_proj_craw:
         p_d = re.compile('\d+')
         end_time = div1_2.find_all('span', {'class': 'f_red'})[0].string.strip()  # 提取截止日期
         end_time = '-'.join(p_d.findall(end_time))
-        end_time = datetime.datetime.strptime(end_time, '%Y-%M-%d')  # 截止日期
+        end_time = datetime.datetime.strptime(end_time, '%Y-%m-%d')  # 截止日期
         target_fund = div1_2.find_all('span', {'class': 'f_red'})[1].get_text()[1:]  # 目标金额
 
         s = self.h_soup.find_all('div', {'class': "tab-share-l"})
@@ -198,11 +198,10 @@ class Single_proj_craw:
 
 class Collect_craw:
 
-    def __init__(self, b_page=1, e_page=12):
-        self.User_Agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:59.0) Gecko/20100101 Firefox/59.0'
+    def __init__(self, e_page=40):
+        self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
-        self.b_page = b_page  # 开始页面
-        self.e_page = e_page  # 终止页面
+        self.e_page = e_page
         # 连接MongoDB数据库
         client = MongoClient('localhost', 27017)
         db = client.moniter_cloudfunding
@@ -218,6 +217,7 @@ class Collect_craw:
         :param pages: 页数
         :return: 项目id列表
         '''
+        # info type_xm项目成功, info type_succeed众筹成功, info type_now众筹中, info type_future 预热中
         if category == '预热中':
             status, class_info, sort = '1', 'info type_future', 'zxsx'  #最新上线
         elif category == '众筹中':
@@ -230,12 +230,14 @@ class Collect_craw:
         p_url = 'https://z.jd.com/bigger/search.html'
         pattern = re.compile("\d+")
         pid_list = []
-        for i in range(self.b_page, self.e_page + 1):
+        i = 1
+        while True:
             time.sleep(0.1)
+            len_pid_list = len(pid_list)
             req = request.Request(p_url)
             # status: 预热中 '1', 众筹中 '2', 众筹成功 '4' 项目成功 '8'
             post_list = [('categoryId', ''), ('keyword', ''), ('page', '%d' % i), ('parentCategoryId', ''),
-                         ('productEnd', ''), ('sceneEnd', ''), ('sort', sort), ('status', status)]
+                         ('productEnd', '-28'), ('sceneEnd', ''), ('sort', sort), ('status', status)]
             post_data = parse.urlencode(post_list)
             req.add_header('User-Agent', self.User_Agent)
             req.add_header('Referer', 'https://z.jd.com/bigger/search.html')
@@ -245,21 +247,25 @@ class Collect_craw:
                 web_data = f.read()
                 soup = BeautifulSoup(web_data, 'html.parser')
                 ul = soup.find_all('div', {'class': 'l-result'})[0].ul  # 注意，不同状态的class有区别
-                # info type_xm项目成功, info type_succeed众筹成功, info type_now众筹中, info type_future 预热中
                 li = ul.find_all('li', {'class': class_info})
                 for l in li:
                     url = l.find_all('a')[0].get('href')
-                    matcher = re.search(pattern, url)
-                    pid_list.append(matcher.group(0))
+                    pid = pattern.findall(url)[0]
+                    pid_list.append(pid)
+
+            i += 1
+            if i == self.e_page or len_pid_list == len(pid_list):
+                print('一共%d页, 有%d个%s项目' % (i - 2, len_pid_list, category))
+                break
 
         return set(pid_list)
 
     def update_pid_cats(self):  # 获取新增project的项目编号
         # 当前各类别页面下的项目列表
-        c_pids_1 = self.get_pid_list('预热中')
-        c_pids_2 = self.get_pid_list('众筹中')
-        c_pids_3 = self.get_pid_list('众筹成功')
-        c_pids_4 = self.get_pid_list('项目成功')
+        c_pids_1 = self.get_pid_list(category='预热中')
+        c_pids_2 = self.get_pid_list(category='众筹中', )
+        c_pids_3 = self.get_pid_list(category='众筹成功')
+        c_pids_4 = self.get_pid_list(category='项目成功')
 
         for p_id in c_pids_1 - self.pid_set1:  # 新增项目
             self.project.insert_one({'_id': p_id, 'category': '预热中', 'state': 'first',
@@ -339,5 +345,5 @@ class Collect_craw:
 
 
 if __name__ == '__main__':
-    c_craw = Collect_craw
-    c_craw.start_craw()
+    c_craw = Collect_craw()
+    #c_craw.start_craw()
