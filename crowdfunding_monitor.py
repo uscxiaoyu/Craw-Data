@@ -12,12 +12,13 @@ context = ssl._create_unverified_context()  # 不验证网页安全性
 
 class Single_proj_craw:
 
-    def __init__(self, p_id, category, end_time):
+    def __init__(self, p_id, category, end_time, count_inqury):
         self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.p_id = p_id
         self.category = category  # 预热中、众筹中、众筹成功、项目成功
         self.end_time = end_time  # 众筹结束时间
+        self.count_inqury = count_inqury  # 访问次数
 
     def page_source(self):
         url_1 = 'http://z.jd.com/project/details/%s.html' % self.p_id
@@ -55,7 +56,7 @@ class Single_proj_craw:
         p_d = re.compile('\d+')
         end_time = div1_2.find_all('span', {'class': 'f_red'})[0].string.strip()  # 提取截止日期
         end_time = '-'.join(p_d.findall(end_time))
-        end_time = datetime.datetime.strptime(end_time, '%Y-%m-%d')  # 截止日期
+        end_time = datetime.datetime.strptime(end_time, '%Y-%m-%d')  # 转化截止日期为标准格式
         target_fund = div1_2.find_all('span', {'class': 'f_red'})[1].get_text()[1:]  # 目标金额
 
         s = self.h_soup.find_all('div', {'class': "tab-share-l"})
@@ -99,7 +100,7 @@ class Single_proj_craw:
                                   'redound_info': redound_info,
                                   'deliver_info': deliver_info}
 
-        return {'proj_name': proj_name, 'target_fund': target_fund, 'end_time': end_time,
+        return {'proj_name': proj_name, 'target_fund': target_fund, 'time_span': end_time,
                 'sort_name': sort_name, 'promoter_href': prom_href, 'promoter_name': prom_name,
                 'company_name': company_name, 'company_address': company_address, 'company_hours': company_hours,
                 'company_phone': company_phone, 'ind_info': indiv_info}
@@ -108,7 +109,7 @@ class Single_proj_craw:
         # 当前筹集金额、当前进度、当前支持人数
         div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
         now_fund = div1.find_all('p', {'class': "p-num"})[0].get_text()[1:]  # 当前项目筹集金额
-        now_percent, now_supporters = None, None
+        now_percent, now_supporters = 0, 0
         try:
             div1_1 = div1.find_all('p', {'class': "p-progress"})[0]
             now_percent = div1_1.find_all('span', {'class': "fl percent"})[0].string[4:-1]  # 当前进度
@@ -137,8 +138,11 @@ class Single_proj_craw:
         updateTime = p_updateTime.findall(self.j_soup)[0]  # 项目更新时间
         updateTime = datetime.datetime.strptime(updateTime, "%Y-%m-%d %H:%M:%S") # 项目创建时间
 
-        return {'dyn_prj_info': {'now_fund': now_fund, 'now_percent': now_percent, 'now_supporters': now_supporters,
-                    'now_praise': praise, 'now_foucus': focus, 'createTime': createTime, 'updateTime': updateTime},
+        return {'inqury_time': datetime.datetime.now(),
+                'dyn_prj_info': {'now_fund': int(now_fund),
+                                 'now_percent': float(now_percent),
+                                 'now_supporters': int(now_supporters),'now_praise': int(praise),
+                                 'now_foucus': int(focus), 'createTime': createTime, 'updateTime': updateTime},
                 'dyn_ind_info': indiv_info}
 
     def review_data(self):
@@ -159,21 +163,19 @@ class Single_proj_craw:
                          ('sort', '1'),
                          ('systemId', '%s' % self.p_id),
                          ('temp', '0.8972247674942638')] # 关键在于systemID，即项目编号
-
             post_data = parse.urlencode(post_list)
-
             f = request.urlopen(req, data=post_data.encode('utf-8'), context=context)
             x = f.read().decode()
             json_x = json.loads(x[x.find('{"listResult"'):-1])
-
             pageBean = json_x['pageBean']
             totalPage = int(pageBean['totalPage'])  # 总页数
             totalRecord = int(pageBean['totalRecord'])  # 总记录数
             # 评论id, 创建时间，点赞数，回复数，内容
             for record in json_x['listResult']:
-                reviews[str(record['topicId'])] = {'createTime': record['createTime'], 'likecount': record['likecount'],
-                                                   'replys': record['replys'], 'topicContent': record['topicContent']}
-
+                reviews[str(record['topicId'])] = {'createTime': record['createTime'],
+                                                   'likecount': int(record['likecount']),
+                                                   'replys': int(record['replys']),
+                                                   'topicContent': record['topicContent']}
             if totalPage > i:
                 i += 1
             else:
@@ -184,10 +186,13 @@ class Single_proj_craw:
     def start_craw(self):
         self.page_source()  # 网页静态信息
         if self.category == '预热中':
-            return self.basic_data(), self.update_data()
+            if self.count_inqury == 1:
+                return self.basic_data(), self.update_data()
+            else:
+                return self.update_data()
 
         elif self.category == '众筹中':
-            if datetime.datetime.now() < self.end_time - datetime.timedelta(hours=12):
+            if datetime.datetime.now() > self.end_time - datetime.timedelta(hours=12):
                 return self.update_data()
             else:
                 return self.update_data(), self.review_data()
@@ -268,19 +273,19 @@ class Collect_craw:
         c_pids_4 = self.get_pid_list(category='项目成功')
 
         for p_id in c_pids_1 - self.pid_set1:  # 新增项目
-            self.project.insert_one({'_id': p_id, 'category': '预热中', 'state': 'first',
-                                     'dyn_prj_info': [], 'dyn_ind_info': []})
+            self.project.insert_one({'_id': p_id, 'category': '预热中', 'dyn_prj_info': [], 'dyn_ind_info': [],
+                                     'insert_time': datetime.datetime.now(), 'count_inqury': 1})
 
-        for p_id in c_pids_2 - self.pid_set2:  # 新增众筹中项目
+        for p_id in (c_pids_2 - self.pid_set2) & self.pid_set1:  # 新增众筹中项目
             self.project.update_one({'_id': p_id}, {'$set': {'category': '众筹中'}})
 
-        for p_id in c_pids_3 - self.pid_set3:  # 新增众筹成功项目
+        for p_id in (c_pids_3 - self.pid_set3) & self.pid_set2:  # 新增众筹成功项目
             self.project.update_one({'_id': p_id}, {'$set': {'category': '众筹成功'}})
 
         for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 众筹未成功项目
             self.project.update_one({'_id': p_id}, {'$set': {'category': '众筹未成功'}})
 
-        for p_id in c_pids_4 - self.pid_set4:  # 新增项目成功项目
+        for p_id in (c_pids_4 - self.pid_set4) & self.pid_set3:  # 新增项目成功项目
             self.project.update_one({'_id': p_id}, {'$set': {'category': '项目成功'}})
 
         for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 项目未成功项目
@@ -292,56 +297,67 @@ class Collect_craw:
         self.update_pid_cats()  # 新增项目，并更新各项目的类别
         i = 1
 
-        # x对应项目静态信息，y对应项目动态信息和各档支持动态信息，z对应评论信息
-        p_dict1 = list(self.project.find({'category': '预热中'}, projection={'_id': True, 'state': True}))
+        # x对应项目静态信息，y对应项目动态信息和各档支持动态信息，z对应评论信息，和单个项目的更新对应
+        p_dict1 = list(self.project.find({'category': '预热中'}, projection={'_id': True,
+                                                                          'state': True, 'count_inqury': True}))
         print('更新预热中的项目列表：')
         for proj in p_dict1:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, category, end_time = proj['_id'], '预热中', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
-            x, y = s_craw.start_craw()
-            self.project.update_one({'_id': p_id},
-                                    {'$set': x,
-                                     '$push': {'dyn_prj_info': y['dyn_prj_info'], 'dyn_ind_info': y['dyn_ind_info']}},
-                                    upsert=True)
+            p_id, category, end_time, count_inqury = proj['_id'], '预热中', proj['end_time'], proj['count_inqury']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time, count_inqury=count_inqury)
+            if count_inqury == 1:
+                x, y = s_craw.start_craw()
+                self.project.update_one({'_id': p_id},
+                                        {'$set': x,
+                                         '$push': {'dyn_prj_info': y['dyn_prj_info'], 'dyn_ind_info': y['dyn_ind_info']}},
+                                        upsert=True)
+            else:
+                y = s_craw.start_craw()
+                self.project.update_one({'_id': p_id}, {'$push': {'dyn_prj_info': y['dyn_prj_info'],
+                                                                  'dyn_ind_info': y['dyn_ind_info']},
+                                                        '&inc': {'count_inqury': 1}})
 
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
             i += 1
 
-        p_dict2 = list(self.project.find({'category': '众筹中'}, projection={'_id': True, 'end_time': True}))
+        p_dict2 = list(self.project.find({'category': '众筹中'}, projection={'_id': True,
+                                                                          'end_time': True, 'count_inqury': True}))
         print('更新众筹中的项目列表：')
         for proj in p_dict2:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, category, end_time = proj['_id'], '众筹中', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
-            if datetime.datetime.now() < end_time - datetime.timedelta(hours=12):
+            p_id, category, end_time, count_inqury = proj['_id'], '众筹中', proj['end_time'], proj['count_inqury']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time, count_inqury=count_inqury)
+            if datetime.datetime.now() > end_time - datetime.timedelta(hours=12):
                 y = s_craw.start_craw()
                 self.project.update_one({'_id': p_id}, {'$push': {'dyn_prj_info': y['dyn_prj_info'],
-                                                                  'dyn_ind_info': y['dyn_ind_info']}})
+                                                                  'dyn_ind_info': y['dyn_ind_info']},
+                                                        '&inc': {'count_inqury': 1}})
             else:
                 y, z = s_craw.start_craw()
                 self.project.update_one({'_id': p_id}, {'$set': z,
                                                         '$push': {'dyn_prj_info': y['dyn_prj_info'],
-                                                                  'dyn_ind_info': y['dyn_ind_info']}})
+                                                                  'dyn_ind_info': y['dyn_ind_info']},
+                                                        '&inc': {'count_inqury': 1}})
 
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
             i += 1
 
-        p_dict3 = list(self.project.find({'category': '众筹成功'}, projection={'_id': True, 'end_time': True}))
+        p_dict3 = list(self.project.find({'category': '众筹成功'}, projection={'_id': True,
+                                                                           'end_time': True, 'count_inqury': True}))
         print('更新众筹成功的项目列表：')
         for proj in p_dict3:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, category, end_time = proj['_id'], '众筹成功', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
+            p_id, category, end_time, count_inqury = proj['_id'], '众筹成功', proj['end_time'], proj['count_inqury']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time, count_inqury=count_inqury)
             z = s_craw.start_craw()
             self.project.update_one({'_id': p_id}, {'$set': z})
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
             i += 1
 
-        print('更新结束', datetime.datetime.now())
+        print('本次更新结束', datetime.datetime.now())
 
 
 if __name__ == '__main__':
