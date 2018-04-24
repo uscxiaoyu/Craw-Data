@@ -12,12 +12,11 @@ context = ssl._create_unverified_context()  # 不验证网页安全性
 
 class Single_proj_craw:
 
-    def __init__(self, p_id, category, state, end_time):
+    def __init__(self, p_id, category, end_time):
         self.User_Agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.p_id = p_id
         self.category = category  # 预热中、众筹中、众筹成功、项目成功
-        self.state = state  # 爬虫状态，first, update, last
         self.end_time = end_time  # 众筹结束时间
 
     def page_source(self):
@@ -51,7 +50,6 @@ class Single_proj_craw:
         # (1)项目信息
         div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
         proj_name = div1.find_all('h1', {'class': 'p-title'})[0].string  # 项目名称
-
 
         div1_2 = div1.find_all('p', {'class': "p-target"})[0]
         p_d = re.compile('\d+')
@@ -294,8 +292,8 @@ class Collect_craw:
         for proj in p_dict1:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, state, category, end_time = proj['_id'], proj['state'], '预热中', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, state=state, end_time=end_time)
+            p_id, category, end_time = proj['_id'], '预热中', proj['end_time']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
             x, y = s_craw.start_craw()
             self.project.update_one({'_id': p_id},
                                     {'$set': x,
@@ -305,14 +303,13 @@ class Collect_craw:
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
             i += 1
 
-        p_dict2 = list(self.project.find({'category': '众筹中'},
-                                         projection={'_id': True, 'state': True, 'end_time': True}))
+        p_dict2 = list(self.project.find({'category': '众筹中'}, projection={'_id': True, 'end_time': True}))
         print('更新众筹中的项目列表：')
         for proj in p_dict2:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, state, category, end_time = proj['_id'], proj['state'], '众筹中', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, state=state, end_time=end_time)
+            p_id, category, end_time = proj['_id'], '众筹中', proj['end_time']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
             if datetime.datetime.now() < end_time - datetime.timedelta(hours=12):
                 y = s_craw.start_craw()
                 self.project.update_one({'_id': p_id}, {'$push': {'dyn_prj_info': y['dyn_prj_info'],
@@ -326,14 +323,13 @@ class Collect_craw:
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
             i += 1
 
-        p_dict3 = list(self.project.find({'category': '众筹成功'},
-                                         projection={'_id': True, 'state': True, 'end_time': True}))
+        p_dict3 = list(self.project.find({'category': '众筹成功'}, projection={'_id': True, 'end_time': True}))
         print('更新众筹成功的项目列表：')
         for proj in p_dict3:
             time.sleep(random.random())
             t1 = time.clock()
-            p_id, state, category, end_time = proj['_id'], proj['state'], '众筹成功', proj['end_time']
-            s_craw = Single_proj_craw(p_id=p_id, category=category, state=state, end_time=end_time)
+            p_id, category, end_time = proj['_id'], '众筹成功', proj['end_time']
+            s_craw = Single_proj_craw(p_id=p_id, category=category, end_time=end_time)
             z = s_craw.start_craw()
             self.project.update_one({'_id': p_id}, {'$set': z})
             print(i, '项目编号: %s' % p_id, '用时: %.2f s' % (time.clock() - t1))
