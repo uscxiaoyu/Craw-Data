@@ -1,3 +1,4 @@
+# coding=utf-8
 from urllib import request
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
