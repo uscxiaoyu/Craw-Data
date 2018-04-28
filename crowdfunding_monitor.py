@@ -218,7 +218,7 @@ class Single_proj_craw:
 
 class Collect_craw:
 
-    def __init__(self, e_page=4):
+    def __init__(self, e_page=5):
         self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.e_page = e_page
@@ -371,7 +371,7 @@ class Collect_craw:
                                                         '$inc': {'爬取次数': 1}})
             print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             i += 1
-        print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.clock() - t1))
+        print('共 %d 项, 用时 %.2f s' % (len(p_dict2), time.clock() - t1))
 
         p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹成功的项目列表===================')
@@ -386,7 +386,7 @@ class Collect_craw:
             self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
             print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             i += 1
-        print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.clock() - t1))
+        print('共 %d 项, 用时 %.2f s' % (len(p_dict3), time.clock() - t1))
 
         print('本次更新结束', datetime.datetime.now())
         print('一共用时: %2.f s' % (time.clock() - t))
