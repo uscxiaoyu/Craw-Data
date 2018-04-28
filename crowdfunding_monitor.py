@@ -218,7 +218,7 @@ class Single_proj_craw:
 
 class Collect_craw:
 
-    def __init__(self, e_page=5):
+    def __init__(self, e_page=6):
         self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.e_page = e_page
@@ -275,10 +275,10 @@ class Collect_craw:
 
             i += 1
             if i > self.e_page or len_pid_list == len(pid_list):
-                print('一共%d页, 有%d个%s项目' % (i - 1, len_pid_list, category))
                 break
-
-        return set(pid_list)
+        pid_set = set(pid_list)
+        print('一共%d页, 有%d个%s项目' % (i - 1, len(pid_set), category))
+        return pid_set
 
     def update_pid_cats(self):  # 获取新增project的项目编号
         # 当前各类别页面下的项目列表
