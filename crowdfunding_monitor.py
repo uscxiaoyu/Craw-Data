@@ -9,6 +9,10 @@ import time
 import json
 import random
 import frontpage
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+
 context = ssl._create_unverified_context()  # 不验证网页安全性
 
 
@@ -391,12 +395,39 @@ class Collect_craw:
         print('本次更新结束', datetime.datetime.now())
         print('一共用时: %2.f s' % (time.clock() - t))
 
+        return len(p_dict1), len(p_dict2), len(p_dict3)
+
+# 发送电子邮件
+def send_mail(title, content, sender='jxndtbxiaoyu@163.com', receivers=['317889109@qq.com'],
+              mail_host='smtp.163.com', mail_user='jxndtbxiaoyu', mail_pass='qiuqiu1125'):
+    message = MIMEText(content, 'plain')
+    message['From'] = sender
+    message['To'] =  ','.join(receivers)
+    message['Subject'] = title
+    try:
+        smtpObj = smtplib.SMTP()
+        smtpObj.connect(mail_host, 25)    # 25 为 SMTP 端口号
+        smtpObj.login(mail_user, mail_pass)
+        smtpObj.sendmail(sender, receivers, message.as_string())
+        print("邮件发送成功!")
+    except smtplib.SMTPException as e:
+        print("Error: 无法发送邮件!")
+        print('错误如下:', e)
 
 if __name__ == '__main__':
-    # 爬取首页上的项目列表
-    front_page = frontpage.Front_page()
-    front_page.start_craw()
+    try:
+        # 爬取首页上的项目列表
+        front_page = frontpage.Front_page()
+        front_page.start_craw()
 
-    # 爬取项目的详细信息
-    c_craw = Collect_craw()
-    c_craw.start_craw()
+        # 爬取项目的详细信息
+        c_craw = Collect_craw()
+        len1, len2, len3 = c_craw.start_craw()
+        title = '爬虫成功执行！'
+        content = '时间: %s \n预热中: %d 项\n众筹中: %d 项\n众筹成功: %d 项' % (datetime.datetime.now(), len1, len2, len3)
+        send_mail(title, content)
+
+    except Exception as e:
+        title = '爬虫出现错误！'
+        content = '时间: %s \n错误信息:\n %s' % (datetime.datetime.now(), e)
+        send_mail(title, content)
