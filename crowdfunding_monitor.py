@@ -398,10 +398,9 @@ class Collect_craw:
         return len(p_dict1), len(p_dict2), len(p_dict3)
 
 # 发送电子邮件
-def send_mail(title, content, sender='xy_workstudio@163.com', receiver='317889109@qq.com',
-              mail_host='smtp.163.com', mail_user='xy_workstudio', mail_pass='xiaoyu1986'):
+def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['京东数据采集员', sender])
+    message['From'] = formataddr(['Unbuntu-京东众筹', sender])
     message['To'] =  formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -425,9 +424,12 @@ if __name__ == '__main__':
         len1, len2, len3 = c_craw.start_craw()
         t_time = datetime.datetime.now()
         t_time = t_time.strftime('%Y-%m-%d %H:%m:%S')
-        title = '爬虫成功执行！%s' % t_time  # 邮件标题
+        title = '爬虫成功执行！' # 邮件标题
         content = '时间: %s \n预热中: %d 项\n众筹中: %d 项\n众筹成功: %d 项' % (t_time, len1, len2, len3)  # 邮件正文
-        send_mail(title, content)
+        f = open('/home/yu/Desktop/1.txt')
+        x = f.read()
+        mail_user, mail_pass, sender, receiver = x.strip().split('/')
+        send_mail(title, content, mail_user, mail_pass, sender, receiver)
 
     except Exception as e:
         title = '爬虫出现错误！'
