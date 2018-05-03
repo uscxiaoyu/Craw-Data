@@ -304,7 +304,7 @@ class Collect_craw:
                                     upsert=True)
 
         for p_id in (self.pid_set1 - c_pids_1) - (c_pids_2 - self.pid_set2):  # 坑！没想到流程上竟然可以由预热中直接到下架。
-            self.project.insert_one({'_id': p_id},  {'$set': {'状态': '众筹失败',
+            self.project.update_one({'_id': p_id},  {'$set': {'状态': '众筹失败',
                                                              '状态变换时间1-2': datetime.datetime.now()}},
                                     upsert=True)
 
@@ -426,7 +426,7 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Unbuntu-京东众筹', sender])
+    message['From'] = formataddr(['Windows-京东众筹', sender])
     message['To'] =  formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -440,6 +440,9 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print('错误如下:', e)
 
 if __name__ == '__main__':
+    f = open('C:/Users/XIAOYU/Desktop/1.txt')
+    x = f.read()
+    mail_user, mail_pass, sender, receiver = x.strip().split('/')
     try:
         # 爬取首页上的项目列表
         front_page = frontpage.Front_page()
@@ -452,12 +455,9 @@ if __name__ == '__main__':
         t_time = t_time.strftime('%Y-%m-%d %H:%m:%S')
         title = '爬虫成功执行！' # 邮件标题
         content = '时间: %s \n预热中: %d 项\n众筹中: %d 项\n众筹成功: %d 项' % (t_time, len1, len2, len3)  # 邮件正文
-        f = open('C:/Users/XIAOYU/Desktop/1.txt')
-        x = f.read()
-        mail_user, mail_pass, sender, receiver = x.strip().split('/')
         send_mail(title, content, mail_user, mail_pass, sender, receiver)
 
     except Exception as e:
         title = '爬虫出现错误！'
         content = '时间: %s \n错误信息:\n %s' % (datetime.datetime.now(), e)
-        send_mail(title, content)
+        send_mail(title, content,  mail_user, mail_pass, sender, receiver)
