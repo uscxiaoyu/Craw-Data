@@ -79,7 +79,7 @@ class Single_proj_craw:
             div3 = self.h_soup.find_all('ul', {'class': "contact-box"})[0]
             div3_li = div3.find_all('li')
             for li in div3_li:  # 少数项目没有公司名称和联系地址
-                key = li.find('div', {'class': "key"}).content[1]
+                key = li.find('div', {'class': "key"}).contents[1]
                 val = li.find('div', {'class': "val"}).string
                 if key == '公司名称：':
                     company_name = val  # 公司名称
@@ -441,8 +441,8 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['MAC-京东众筹', sender])
-    message['To'] =  formataddr(['QQ', receiver])
+    message['From'] = formataddr(['Ubuntu-京东众筹', sender])
+    message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
         smtpObj = smtplib.SMTP()
@@ -455,7 +455,7 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print('错误如下:', e)
 
 if __name__ == '__main__':
-    f = open('/Users/xiaoyu/Desktop/1.txt')
+    f = open('/home/yu/Desktop/1.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
     try:
