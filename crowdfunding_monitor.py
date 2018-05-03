@@ -79,8 +79,8 @@ class Single_proj_craw:
             div3 = self.h_soup.find_all('ul', {'class': "contact-box"})[0]
             div3_li = div3.find_all('li')
             for li in div3_li:  # 少数项目没有公司名称和联系地址
-                key = li.find_all('div', {'class': "key"})[0].string
-                val = li.find_all('div', {'class': "val"})[0].string
+                key = li.find('div', {'class': "key"}).content[1]
+                val = li.find('div', {'class': "val"}).string
                 if key == '公司名称：':
                     company_name = val  # 公司名称
                 elif key == '联系地址：':
@@ -441,7 +441,7 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Windows-京东众筹', sender])
+    message['From'] = formataddr(['MAC-京东众筹', sender])
     message['To'] =  formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
