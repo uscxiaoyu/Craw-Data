@@ -230,10 +230,8 @@ class Collect_craw:
         self.e_page = e_page
         # 连接MongoDB数据库
         client = MongoClient('localhost', 27017)
-        db = client.moniter_crowdfunding
-        self.now = datetime.datetime.now()
-        self.project = db.projects  # 监测中的collection
-        self.failure_project = db.failure_projects  # 众筹失败collection
+        db = client.moniter_cloudfunding
+        self.project = db.projects
         # 如果是第一次启动，则以下集合为空集
         self.pid_set1 = {x['_id'] for x in list(self.project.find({'状态': '预热中'}, projection={'_id': True}))}
         self.pid_set2 = {x['_id'] for x in list(self.project.find({'状态': '众筹中'}, projection={'_id': True}))}
@@ -288,60 +286,13 @@ class Collect_craw:
         print('一共%d页, 有%d个%s项目' % (i - 1, len(pid_set), category))
         return pid_set
 
-    def update_pid_cats(self):  # 获取新增project的项目编号
+    def update_pid_cats(self, p_id):  # 获取新增project的项目编号
         # 当前各类别页面下的项目列表
-        c_pids_1 = self.get_pid_list(category='预热中')
-        c_pids_2 = self.get_pid_list(category='众筹中', )
-        c_pids_3 = self.get_pid_list(category='众筹成功')
-        c_pids_4 = self.get_pid_list(category='项目成功')
+        s_craw = Single_proj_craw(p_id=p_id, category=category, count_inqury=count_inqury)
+        if s_craw.isDirected:
 
-        # chang_i_j为从一种状态到另一种状态的转变时间
-        for p_id in c_pids_1 - self.pid_set1:  # 新增项目，
-            try:  # 有些项目使用了上一周期已失败项目的id
-                self.project.insert_one({'_id': p_id, '状态': '预热中', '项目动态信息': [], '各档动态信息': [],
-                                         '状态变换时间0-1': datetime.datetime.now(), '爬取次数': 0})
-            except Exception as e:
-                print(e)
+        else:
 
-        for p_id in (c_pids_2 - self.pid_set2) & self.pid_set1:  # 新增众筹中项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹中',
-                                                             '状态变换时间1-2': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (self.pid_set1 - c_pids_1) - (c_pids_2 - self.pid_set2):  # 坑！没想到流程上竟然可以由预热中直接到下架。
-            self.project.update_one({'_id': p_id},  {'$set': {'状态': '众筹失败',
-                                                             '状态变换时间1-2': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (c_pids_3 - self.pid_set3) & self.pid_set2:  # 新增众筹成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹成功',
-                                                              '状态变换时间2-3': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 众筹未成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹未成功',
-                                                             '状态变换时间2-3': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (c_pids_4 - self.pid_set4) & self.pid_set3:  # 新增项目成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目成功',
-                                                             '状态变换时间3-4': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 项目未成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
-                                                             '状态变换时间3_4': datetime.datetime.now()}},
-                                    upsert=True)
-
-    def transfer_recodes(self):  # 转移未成功项目，可能与将来的project编号冲突
-        pid_set5 = list(self.project.find({'状态': '众筹失败'}))
-        pid_set6 = list(self.project.find({'状态': '众筹未成功'}))
-        pid_set7 = list(self.project.find({'状态': '项目未成功'}))
-        failure_list = pid_set5 + pid_set6 + pid_set7
-        for record in failure_list:
-            self.failure_project.insert_one({'项目编号': record['_id'], '失败时间': self.now, '详细信息': record})
-            self.project.delete_one({'_id': record['_id']})
-            print('项目失败', 'id: %s ' % record['_id'], '名称: %s ' % record['项目名称'])
 
     def start_craw(self):
         t = time.clock()
@@ -441,7 +392,7 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Windows-京东众筹', sender])
+    message['From'] = formataddr(['Unbuntu-京东众筹', sender])
     message['To'] =  formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -455,27 +406,24 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print('错误如下:', e)
 
 if __name__ == '__main__':
-    f = open('/Users/xiaoyu/Desktop/1.txt')
-    x = f.read()
-    mail_user, mail_pass, sender, receiver = x.strip().split('/')
     try:
         # 爬取首页上的项目列表
         front_page = frontpage.Front_page()
         front_page.start_craw()
 
-        # 爬取项目信息并处理数据
+        # 爬取项目的详细信息
         c_craw = Collect_craw()
-        c_craw.transfer_recodes()  # 转移已失败的众筹项目信息
-        len1, len2, len3 = c_craw.start_craw()  # 爬取项目的详细信息
-
-        # 发送电子邮件
+        len1, len2, len3 = c_craw.start_craw()
         t_time = datetime.datetime.now()
         t_time = t_time.strftime('%Y-%m-%d %H:%m:%S')
         title = '爬虫成功执行！' # 邮件标题
         content = '时间: %s \n预热中: %d 项\n众筹中: %d 项\n众筹成功: %d 项' % (t_time, len1, len2, len3)  # 邮件正文
+        f = open('C:/Users/XIAOYU/Desktop/1.txt')
+        x = f.read()
+        mail_user, mail_pass, sender, receiver = x.strip().split('/')
         send_mail(title, content, mail_user, mail_pass, sender, receiver)
 
     except Exception as e:
         title = '爬虫出现错误！'
         content = '时间: %s \n错误信息:\n %s' % (datetime.datetime.now(), e)
-        send_mail(title, content,  mail_user, mail_pass, sender, receiver)
+        send_mail(title, content)
