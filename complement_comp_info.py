@@ -4,19 +4,15 @@ from bs4 import BeautifulSoup
 from pymongo import MongoClient
 import datetime
 import ssl
-import re
 
 context = ssl._create_unverified_context()  # 不验证网页安全性
 
 class Single_proj_craw:
 
-    def __init__(self, p_id, category, count_inqury):
+    def __init__(self, p_id):
         self.User_Agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:59.0) Gecko/20100101 Firefox/59.0'
         self.Host = 'z.jd.com'
         self.p_id = p_id
-        self.category = category  # 预热中、众筹中、众筹成功、项目成功
-        self.count_inqury = count_inqury  # 访问次数
-        self.p_d = re.compile('\d+')
         self.craw_time = datetime.datetime.now()
 
         url_1 = 'http://z.jd.com/project/details/%s.html' % self.p_id
@@ -28,26 +24,7 @@ class Single_proj_craw:
             rawhtml = f.read().decode('utf-8')
             self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
 
-        if self.isDirected:
-            url_2 = 'http://sq.jr.jd.com/cm/getCount?'
-            req = request.Request(url_2)
-            req.add_header('User-Agent', self.User_Agent)
-            req.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
-            req.add_header('Host', self.Host)
-
-            post_list = [('_', '15242091922'),
-                         ('callback', 'jQuery183000564758012421237_1524209188840'),
-                         ('key', '1000'),
-                         ('pin', ''),
-                         ('systemId', self.p_id),
-                         ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
-
-            post_data = parse.urlencode(post_list)
-
-            with request.urlopen(req, data=post_data.encode('utf-8')) as f:
-                self.j_soup = f.read().decode()
-
-    def basic_data(self):
+    def company_data(self):
         div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
         proj_name = div1.find_all('h1', {'class': 'p-title'})[0].string  # 项目名称
         company_name, company_address, company_phone, company_hours = None, None, None, None  # 先设为None
@@ -68,7 +45,18 @@ class Single_proj_craw:
         except IndexError:
             print('No company info')
 
-        return {'项目名称': proj_name, '公司名称': company_name, '公司地址': company_address, '公司工作时间': company_hours,
-                '公司电话': company_phone}
+        return {'公司名称': company_name, '公司地址': company_address, '公司工作时间': company_hours, '公司电话': company_phone}
 
-
+if __name__ == '__main__':
+    client = MongoClient('localhost', 27017)
+    db = client.moniter_crowdfunding
+    project = db.projects  # 监测中的collection
+    pid_set = [x['_id'] for x in list(project.find({}, projection={'_id': True}))]
+    for p_id in pid_set:
+        try:
+            s_project = Single_proj_craw(p_id)
+            update_info = s_project.company_data()
+            project.update_one({'_id': p_id}, {'$set': update_info})
+            print(p_id, '公司名称: %s' % update_info['公司名称'])
+        except Exception as e:
+            print(p_id, '众筹失败')
