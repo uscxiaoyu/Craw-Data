@@ -304,33 +304,39 @@ class Collect_craw:
                 print(e)
 
         for p_id in (c_pids_2 - self.pid_set2) & self.pid_set1:  # 新增众筹中项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹中',
-                                                             '状态变换时间1-2': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '众筹中',
+                                              '状态变换时间1-2': datetime.datetime.now()}},
                                     upsert=True)
 
         for p_id in (self.pid_set1 - c_pids_1) - (c_pids_2 - self.pid_set2):  # 坑！没想到流程上竟然可以由预热中直接到下架。
-            self.project.update_one({'_id': p_id},  {'$set': {'状态': '众筹失败',
-                                                             '状态变换时间1-2': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '众筹失败',
+                                              '状态变换时间1-2': datetime.datetime.now()}},
                                     upsert=True)
 
         for p_id in (c_pids_3 - self.pid_set3) & self.pid_set2:  # 新增众筹成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹成功',
-                                                              '状态变换时间2-3': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '众筹成功',
+                                              '状态变换时间2-3': datetime.datetime.now()}},
                                     upsert=True)
 
         for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 众筹未成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹未成功',
-                                                             '状态变换时间2-3': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '众筹未成功',
+                                              '状态变换时间2-3': datetime.datetime.now()}},
                                     upsert=True)
 
         for p_id in (c_pids_4 - self.pid_set4) & self.pid_set3:  # 新增项目成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目成功',
-                                                             '状态变换时间3-4': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '项目成功',
+                                              '状态变换时间3-4': datetime.datetime.now()}},
                                     upsert=True)
 
         for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 项目未成功项目
-            self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
-                                                             '状态变换时间3_4': datetime.datetime.now()}},
+            self.project.update_one({'_id': p_id},
+                                    {'$set': {'状态': '项目未成功',
+                                              '状态变换时间3_4': datetime.datetime.now()}},
                                     upsert=True)
 
     def transfer_recodes(self):  # 转移未成功项目，可能与将来的project编号冲突
@@ -357,28 +363,28 @@ class Collect_craw:
             print(i, end=' ')
             p_id, category, count_inqury = proj['_id'], '预热中', proj['爬取次数']
             s_craw = Single_proj_craw(p_id=p_id, category=category, count_inqury=count_inqury)
-            if s_craw.isDirected:  # 如果没有发生重定向
-                if count_inqury == 0:
-                    x, y = s_craw.start_craw()
-                    self.project.update_one({'_id': p_id},
-                                            {'$set': x,
-                                             '$push': {'项目动态信息': y['项目动态信息'],
-                                                       '各档动态信息': y['各档动态信息']},
-                                             '$inc': {'爬取次数': 1}},
-                                            upsert=True)
-                else:
+            print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
+            if count_inqury == 0:
+                x, y = s_craw.start_craw()
+                self.project.update_one({'_id': p_id},
+                                        {'$set': x,
+                                         '$push': {'项目动态信息': y['项目动态信息'],
+                                                   '各档动态信息': y['各档动态信息']},
+                                         '$inc': {'爬取次数': 1}},
+                                        upsert=True)
+            else:
+                if s_craw.isDirected:  # 如果没有发生重定向
                     y = s_craw.start_craw()
                     self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': y['项目动态信息'],
                                                                       '各档动态信息': y['各档动态信息']},
                                                             '$inc': {'爬取次数': 1}},
                                             upsert=True)
-
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
-
-            else:
-                self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹失败',
-                                                                 '状态变换时间1-2': datetime.datetime.now()}})
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1), '众筹失败，不再监测！')
+                else:
+                    self.project.update_one({'_id': p_id},
+                                            {'$set': {'状态': '众筹失败',
+                                                                     '状态变换时间1-2': datetime.datetime.now()}},
+                                            upsert=True)
+                    print('众筹失败，不再监测！')
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.clock() - t1))
@@ -392,6 +398,7 @@ class Collect_craw:
             t1 = time.clock()
             p_id, category, count_inqury = proj['_id'], '众筹中', proj['爬取次数']
             s_craw = Single_proj_craw(p_id=p_id, category=category, count_inqury=count_inqury)
+            print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             if s_craw.isDirected:
                 s_data = s_craw.start_craw()
                 if datetime.datetime.now() < s_craw.end_time - datetime.timedelta(hours=12):
@@ -403,11 +410,12 @@ class Collect_craw:
                                                             '$push': {'项目动态信息': s_data[0]['项目动态信息'],
                                                                       '各档动态信息': s_data[0]['各档动态信息']},
                                                             '$inc': {'爬取次数': 1}})
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             else:
-                self.project.update_one({'_id': p_id}, {'$set': {'状态': '众筹未成功',
-                                                                 '状态变换时间2-3': datetime.datetime.now()}})
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1), '众筹未成功，不再监测！')
+                self.project.update_one({'_id': p_id},
+                                        {'$set': {'状态': '众筹未成功',
+                                                  '状态变换时间2-3': datetime.datetime.now()}},
+                                        upsert=True)
+                print('众筹未成功，不再监测！')
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict2), time.clock() - t1))
@@ -421,14 +429,15 @@ class Collect_craw:
             t1 = time.clock()
             p_id, category, count_inqury = proj['_id'], '众筹成功', proj['爬取次数']
             s_craw = Single_proj_craw(p_id=p_id, category=category, count_inqury=count_inqury)
+            print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             if s_craw.isDirected:
                 s_data = s_craw.start_craw()
                 self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
             else:
                 self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
-                                                                 '状态变换时间3-4': datetime.datetime.now()}})
-                print('  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1), '项目未成功，不再监测！')
+                                                                 '状态变换时间3-4': datetime.datetime.now()}},
+                                        upsert=True)
+                print('项目未成功，不再监测！')
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict3), time.clock() - t1))
