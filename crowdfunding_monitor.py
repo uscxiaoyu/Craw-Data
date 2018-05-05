@@ -28,32 +28,29 @@ class Single_proj_craw:
         self.craw_time = datetime.datetime.now()
 
         url_1 = 'http://z.jd.com/project/details/%s.html' % self.p_id
-        req = request.Request(url_1)
-        req.add_header('User-Agent', self.User_Agent)
-        req.add_header('Host', self.Host)
-        with request.urlopen(req, context=context) as f:
-            self.isDirected = url_1 == f.geturl()  # 是否发生重定向，如果发生重定向，则说明项目失败；双重保护
-            rawhtml = f.read().decode('utf-8')
-            self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
+        req_1 = request.Request(url_1)
+        req_1.add_header('User-Agent', self.User_Agent)
+        req_1.add_header('Host', self.Host)
+        with request.urlopen(req_1, context=context) as f_1:
+            self.isDirected = url_1 == f_1.geturl()  # 是否发生重定向，如果发生重定向，则说明项目失败；双重保护
+            if self.isDirected:
+                rawhtml = f_1.read().decode('utf-8')
+                self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
 
-        if self.isDirected:
-            url_2 = 'http://sq.jr.jd.com/cm/getCount?'
-            req = request.Request(url_2)
-            req.add_header('User-Agent', self.User_Agent)
-            req.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
-            req.add_header('Host', self.Host)
-
-            post_list = [('_', '15242091922'),
-                         ('callback', 'jQuery183000564758012421237_1524209188840'),
-                         ('key', '1000'),
-                         ('pin', ''),
-                         ('systemId', self.p_id),
-                         ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
-
-            post_data = parse.urlencode(post_list)
-
-            with request.urlopen(req, data=post_data.encode('utf-8')) as f:
-                self.j_soup = f.read().decode()
+                url_2 = 'http://sq.jr.jd.com/cm/getCount?'
+                req_2 = request.Request(url_2)
+                req_2.add_header('User-Agent', self.User_Agent)
+                req_2.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
+                req_2.add_header('Host', self.Host)
+                post_list = [('_', '15242091922'),
+                             ('callback', 'jQuery183000564758012421237_1524209188840'),
+                             ('key', '1000'),
+                             ('pin', ''),
+                             ('systemId', self.p_id),
+                             ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
+                post_data = parse.urlencode(post_list)
+                with request.urlopen(req_2, data=post_data.encode('utf-8')) as f_2:
+                    self.j_soup = f_2.read().decode()
 
     def basic_data(self):
         # (1)项目信息
@@ -296,7 +293,7 @@ class Collect_craw:
         c_pids_4 = self.get_pid_list(category='项目成功')
 
         # chang_i_j为从一种状态到另一种状态的转变时间
-        for p_id in c_pids_1 - self.pid_set1:  # 新增项目，
+        for p_id in c_pids_1 - self.pid_set1:  # 新增预热中项目
             try:  # 有些项目使用了上一周期已失败项目的id
                 self.project.insert_one({'_id': p_id, '状态': '预热中', '项目动态信息': [], '各档动态信息': [],
                                          '状态变换时间0-1': datetime.datetime.now(), '爬取次数': 0})
@@ -321,7 +318,7 @@ class Collect_craw:
                                               '状态变换时间2-3': datetime.datetime.now()}},
                                     upsert=True)
 
-        for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 众筹未成功项目
+        for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 新增众筹未成功项目
             self.project.update_one({'_id': p_id},
                                     {'$set': {'状态': '众筹未成功',
                                               '状态变换时间2-3': datetime.datetime.now()}},
@@ -333,7 +330,7 @@ class Collect_craw:
                                               '状态变换时间3-4': datetime.datetime.now()}},
                                     upsert=True)
 
-        for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 项目未成功项目
+        for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 新增项目未成功项目
             self.project.update_one({'_id': p_id},
                                     {'$set': {'状态': '项目未成功',
                                               '状态变换时间3_4': datetime.datetime.now()}},
@@ -347,14 +344,15 @@ class Collect_craw:
         for record in failure_list:
             self.failure_project.insert_one({'项目编号': record['_id'], '失败时间': self.now, '详细信息': record})
             self.project.delete_one({'_id': record['_id']})
-            print('项目失败', 'id: %s ' % record['_id'], '名称: %s ' % record['项目名称'])
+            print('项目失败，转移数据！', 'id: %s ' % record['_id'], '名称: %s ' % record['项目名称'])
 
     def start_craw(self):
         t = time.clock()
+        print('*********************************************************')
         print('开始更新', datetime.datetime.now())
         self.update_pid_cats()  # 新增项目，并更新各项目的类别
         i = 1
-        # x对应项目静态信息，y对应项目动态信息和各档支持动态信息，z对应评论信息，和单个项目的更新对应
+        # 更新预热中项目信息
         p_dict1 = list(self.project.find({'状态': '预热中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新预热中的项目列表===================')
         t1 = time.clock()
@@ -382,13 +380,13 @@ class Collect_craw:
                 else:
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹失败',
-                                                                     '状态变换时间1-2': datetime.datetime.now()}},
+                                                      '状态变换时间1-2': datetime.datetime.now()}},
                                             upsert=True)
                     print('众筹失败，不再监测！')
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.clock() - t1))
-
+        #更新众筹中项目信息
         p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹中的项目列表===================')
         t1 = time.clock()
@@ -419,7 +417,7 @@ class Collect_craw:
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict2), time.clock() - t1))
-
+        # 更新众筹成功项目信息
         p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹成功的项目列表===================')
         t1 = time.clock()
@@ -441,16 +439,17 @@ class Collect_craw:
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict3), time.clock() - t1))
-
+        print('=========================================================')
         print('本次更新结束', datetime.datetime.now())
         print('一共用时: %2.f s' % (time.clock() - t))
+        print('*********************************************************')
 
         return len(p_dict1), len(p_dict2), len(p_dict3)
 
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Ubuntu-京东众筹', sender])
+    message['From'] = formataddr(['Windows-京东众筹', sender])
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -464,7 +463,7 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print('错误如下:', e)
 
 if __name__ == '__main__':
-    f = open('/home/yu/Desktop/1.txt')
+    f = open('C:/Users/XIAOYU/Desktop/1.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
     try:
