@@ -32,7 +32,7 @@ class Single_proj_craw:
         req_1.add_header('User-Agent', self.User_Agent)
         req_1.add_header('Host', self.Host)
         with request.urlopen(req_1, context=context) as f_1:
-            self.isDirected = url_1 == f_1.geturl()  # 是否发生重定向，如果发生重定向，则说明项目失败；双重保护
+            self.isDirected = (self.p_id in f_1.geturl())  # 如果p_id不在实际url中，则说明发生了重定向，项目失败
             if self.isDirected:
                 rawhtml = f_1.read().decode('utf-8')
                 self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
@@ -306,21 +306,9 @@ class Collect_craw:
                                               '状态变换时间1-2': datetime.datetime.now()}},
                                     upsert=True)
 
-        for p_id in (self.pid_set1 - c_pids_1) - (c_pids_2 - self.pid_set2):  # 坑！没想到流程上竟然可以由预热中直接到下架。
-            self.project.update_one({'_id': p_id},
-                                    {'$set': {'状态': '众筹失败',
-                                              '状态变换时间1-2': datetime.datetime.now()}},
-                                    upsert=True)
-
         for p_id in (c_pids_3 - self.pid_set3) & self.pid_set2:  # 新增众筹成功项目
             self.project.update_one({'_id': p_id},
                                     {'$set': {'状态': '众筹成功',
-                                              '状态变换时间2-3': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (self.pid_set2 - c_pids_2) - (c_pids_3 - self.pid_set3):  # 新增众筹未成功项目
-            self.project.update_one({'_id': p_id},
-                                    {'$set': {'状态': '众筹未成功',
                                               '状态变换时间2-3': datetime.datetime.now()}},
                                     upsert=True)
 
@@ -328,12 +316,6 @@ class Collect_craw:
             self.project.update_one({'_id': p_id},
                                     {'$set': {'状态': '项目成功',
                                               '状态变换时间3-4': datetime.datetime.now()}},
-                                    upsert=True)
-
-        for p_id in (self.pid_set3 - c_pids_3) - (c_pids_4 - self.pid_set4):  # 新增项目未成功项目
-            self.project.update_one({'_id': p_id},
-                                    {'$set': {'状态': '项目未成功',
-                                              '状态变换时间3_4': datetime.datetime.now()}},
                                     upsert=True)
 
     def transfer_recodes(self):  # 转移未成功项目，可能与将来的project编号冲突
@@ -473,8 +455,8 @@ if __name__ == '__main__':
 
         # 爬取项目信息并处理数据
         c_craw = Collect_craw()
-        c_craw.transfer_recodes()  # 转移已失败的众筹项目信息
         len1, len2, len3 = c_craw.start_craw()  # 爬取项目的详细信息
+        c_craw.transfer_recodes()  # 转移已失败的众筹项目信息
 
         # 发送电子邮件
         t_time = datetime.datetime.now()
