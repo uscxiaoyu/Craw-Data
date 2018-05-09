@@ -313,9 +313,12 @@ class Collect_craw:
         print('开始更新', datetime.datetime.now())
         self.check_new_projs()  # 新增项目，并更新各项目的类别
         i = 1
+        count_fail = 0  # 失败数
         # (1) 更新预热中项目信息
         p_dict1 = list(self.project.find({'状态': '预热中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新预热中的项目列表===================')
+        a = 0  # 预热中项目个数
+        a_b = 0  # 预热中->众筹中
         t1 = time.clock()
         for proj in p_dict1:
             time.sleep(random.random())
@@ -356,6 +359,8 @@ class Collect_craw:
         # (2) 更新众筹中项目信息
         p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹中的项目列表===================')
+        b = 0  # 众筹中项目数量
+        b_c = 0  # 众筹中->众筹成功
         t1 = time.clock()
         for proj in p_dict2:
             time.sleep(random.random())
@@ -375,18 +380,20 @@ class Collect_craw:
                                                             '$push': {'项目动态信息': s_data[0]['项目动态信息'],
                                                                       '各档动态信息': s_data[0]['各档动态信息']},
                                                             '$inc': {'爬取次数': 1}})
+                b += 1
             elif now_category == '众筹成功':  # 更新为众筹成功状态，记录状态变换时间
                 self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
                                                                  '状态变换时间2-3': self.now}},
                                         upsert=True)
                 print('  转换为%s状态' % now_category)
-
+                b_c += 1
             else:
                 self.project.update_one({'_id': p_id},
                                         {'$set': {'状态': '众筹未成功',
                                                   '状态变换时间2-3': self.now}},
                                         upsert=True)
                 print('众筹未成功，不再监测！')
+                count_fail += 1
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict2), time.clock() - t1))
@@ -394,6 +401,8 @@ class Collect_craw:
         # (3) 更新众筹成功项目信息
         p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹成功的项目列表===================')
+        c = 0  # 众筹成功项目数量
+        c_d = 0  # 众筹成功->项目成功
         t1 = time.clock()
         for proj in p_dict3:
             time.sleep(random.random())
@@ -405,16 +414,19 @@ class Collect_craw:
             if now_category == '众筹成功':
                 s_data = s_craw.start_craw()
                 self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
+                c += 1
             elif now_category == '项目成功':  # 更新为项目成功状态，记录状态变换时间
                 self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
                                                                  '状态变换时间3-4': self.now}},
                                         upsert=True)
                 print('  转换为%s状态' % now_category)
+                c_d += 1
             else:
                 self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
                                                                  '状态变换时间3-4': self.now}},
                                         upsert=True)
                 print('项目未成功，不再监测！')
+                count_fail += 1
 
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict3), time.clock() - t1))
@@ -423,12 +435,12 @@ class Collect_craw:
         print('一共用时: %2.f s' % (time.clock() - t))
         print('*********************************************************')
 
-        return len(p_dict1), len(p_dict2), len(p_dict3)
+        return a, a_b, b, b_c, c, c_d, count_fail
 
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Windows-京东众筹', sender])
+    message['From'] = formataddr(['Ubuntu-京东众筹', sender])
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -442,9 +454,10 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print('错误如下:', e)
 
 if __name__ == '__main__':
-    f = open('C:/Users/XIAOYU/Desktop/1.txt')
+    f = open('/home/yu/Desktop/1.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
+
     try:
         # 爬取首页上的项目列表
         front_page = frontpage.Front_page()
@@ -452,14 +465,20 @@ if __name__ == '__main__':
 
         # 爬取项目信息并处理数据
         c_craw = Collect_craw()
-        len1, len2, len3 = c_craw.start_craw()  # 爬取项目的详细信息
+        c_craw.transfer_recodes()
+        c_info = c_craw.start_craw()  # 爬取项目的详细信息
         c_craw.transfer_recodes()  # 转移已失败的众筹项目信息
 
         # 发送电子邮件
         t_time = datetime.datetime.now()
         t_time = t_time.strftime('%Y-%m-%d %H:%m:%S')
-        title = '爬虫成功执行！' # 邮件标题
-        content = '时间: %s \n预热中: %d 项\n众筹中: %d 项\n众筹成功: %d 项' % (t_time, len1, len2, len3)  # 邮件正文
+        title = '爬虫成功执行！'  # 邮件标题
+        content = """时间: %s\n
+预热中: %d 项\n预热中->众筹中: %d 项\n
+众筹中: %d 项\n众筹中->众筹成功: %d 项\n
+众筹成功: %d 项\n众筹成功->项目成功: %d 项\n
+失败: %d项""" % (t_time, *c_info)  # 邮件正文
+        print('小结:\n', content)
         send_mail(title, content, mail_user, mail_pass, sender, receiver)
     except Exception as e:
         title = '爬虫出现错误！'
