@@ -334,6 +334,7 @@ class Collect_craw:
                                                    '各档动态信息': s_data[1]['各档动态信息']},
                                          '$inc': {'爬取次数': 1}},
                                         upsert=True)
+                a += 1
             else:
                 if now_category == '预热中':
                     s_data = s_craw.start_craw()
@@ -341,18 +342,20 @@ class Collect_craw:
                                                                       '各档动态信息': s_data['各档动态信息']},
                                                             '$inc': {'爬取次数': 1}},
                                             upsert=True)
+                    a += 1
                 elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
                                                                      '状态变换时间1-2': self.now}},
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
+                    a_b += 1
                 else:
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹失败',
                                                       '状态变换时间1-2': self.now}},
                                             upsert=True)
                     print('众筹失败，不再监测！')
-
+                    count_fail += 1
             i += 1
         print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.clock() - t1))
 
