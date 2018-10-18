@@ -462,6 +462,7 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
         print("Error: 无法发送邮件!")
         print('错误如下:', e)
 
+
 if __name__ == '__main__':
     f = open('/home/yu/Desktop/1.txt')
     x = f.read()
