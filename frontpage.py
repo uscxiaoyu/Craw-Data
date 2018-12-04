@@ -71,9 +71,13 @@ class Front_page:
         return {"最新上架": [self.pattern.findall(x)[0] for x in urls]}
 
     def nearendproj(self):  # (4) 即将结束项目列表
-        div_end = self.soup.find_all('div', {'class': 'new-list'})[1]
-        urls = [x.a['href'] for x in div_end.ul.find_all('li')]
-        return {"即将结束": [self.pattern.findall(x)[0] for x in urls]}
+        try:
+            div_end = self.soup.find_all('div', {'class': 'new-list'})[1]
+            urls = [x.a['href'] for x in div_end.ul.find_all('li')]
+            return {"即将结束": [self.pattern.findall(x)[0] for x in urls]}
+        except IndexError as I:
+            print(I, "无即将结束项目")
+            return {"即将结束": []}
 
     def demosproj(self):  # (5) 各类展品
         div_sum = self.soup.find_all('div', {'class': 'tab-div'})
