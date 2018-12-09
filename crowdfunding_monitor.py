@@ -200,10 +200,7 @@ class Single_proj_craw:
             totalRecord = int(pageBean['totalRecord'])  # 总记录数
             # 评论id, 创建时间，点赞数，回复数，内容
             for record in json_x['listResult']:
-                reviews[str(record['topicId'])] = {'创建时间': record['createTime'],
-                                                   '点赞数': int(record['likecount']),
-                                                   '回复数': int(record['replys']),
-                                                   '评论内容': record['topicContent']}
+                reviews[str(record['topicId'])] = record  # 存储所有评论信息
             if totalPage > i:
                 i += 1
             else:
