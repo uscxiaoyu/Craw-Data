@@ -1,4 +1,3 @@
-#!/usr/bin/python3.7
 from urllib import request, parse
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
@@ -320,40 +319,44 @@ class Collect_craw:
         for proj in p_dict1:
             time.sleep(random.random())
             p_id, count_inqury = proj['_id'], proj['爬取次数']
-            s_craw = Single_proj_craw(p_id=p_id, count_inqury=count_inqury)
-            now_category = s_craw.category
-            print(i, '  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
-            if count_inqury == 0:
-                s_data = s_craw.start_craw()
-                self.project.update_one({'_id': p_id},
-                                        {'$set': s_data[0],
-                                         '$push': {'项目动态信息': s_data[1]['项目动态信息'],
-                                                   '各档动态信息': s_data[1]['各档动态信息']},
-                                         '$inc': {'爬取次数': 1}},
-                                        upsert=True)
-                a += 1
-            else:
-                if now_category == '预热中':
+            try:
+                s_craw = Single_proj_craw(p_id=p_id, count_inqury=count_inqury)
+                now_category = s_craw.category
+                print(i, '  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
+                if count_inqury == 0:
                     s_data = s_craw.start_craw()
-                    self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
-                                                                      '各档动态信息': s_data['各档动态信息']},
-                                                            '$inc': {'爬取次数': 1}},
+                    self.project.update_one({'_id': p_id},
+                                            {'$set': s_data[0],
+                                            '$push': {'项目动态信息': s_data[1]['项目动态信息'],
+                                                    '各档动态信息': s_data[1]['各档动态信息']},
+                                            '$inc': {'爬取次数': 1}},
                                             upsert=True)
                     a += 1
-                elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
-                    self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
-                                                                     '状态变换时间1-2': self.now}},
-                                            upsert=True)
-                    print('  转换为%s状态' % now_category)
-                    a_b += 1
                 else:
-                    self.project.update_one({'_id': p_id},
-                                            {'$set': {'状态': '众筹失败',
-                                                      '状态变换时间1-2': self.now}},
-                                            upsert=True)
-                    print('众筹失败，不再监测！')
-                    count_fail += 1
+                    if now_category == '预热中':
+                        s_data = s_craw.start_craw()
+                        self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
+                                                                        '各档动态信息': s_data['各档动态信息']},
+                                                                '$inc': {'爬取次数': 1}},
+                                                upsert=True)
+                        a += 1
+                    elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
+                        self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
+                                                                        '状态变换时间1-2': self.now}},
+                                                upsert=True)
+                        print('  转换为%s状态' % now_category)
+                        a_b += 1
+                    else:
+                        self.project.update_one({'_id': p_id},
+                                                {'$set': {'状态': '众筹失败',
+                                                        '状态变换时间1-2': self.now}},
+                                                upsert=True)
+                        print('众筹失败，不再监测！')
+                        count_fail += 1
+            except Exception as e:
+                print('  {i}, {p_id}  爬取失败！', e)
             i += 1
+
         print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.process_time() - t1))
 
         # (2) 更新众筹中项目信息

@@ -1,3 +1,4 @@
+#! /usr/bin/python3.7
 from urllib import request, parse
 from bs4 import BeautifulSoup, Comment
 from pymongo import MongoClient
