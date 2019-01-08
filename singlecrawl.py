@@ -67,9 +67,9 @@ class Single_proj_craw:
                         self.j_soup = f_2.read().decode()
                 else:
                     self.category = "重定向"
-        except Exception as e:
-            self.category = "超时"
-            print(f"  网页获取{e}")
+        except socket.timeout as e:
+            self.category = e
+            print(f"{self.p_id}网页获取出错: {e}")
 
     def basic_data(self):
         # (1)项目信息

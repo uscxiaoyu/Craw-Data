@@ -179,7 +179,7 @@ class Collect_craw:
             except Exception as e:
                 print('  爬取失败！', e)
         return b, b_c, count_fail
-
+        
     def update_zcsuc(self, p_dict):  # 更新众筹成功项目
         count_fail = 0
         c = 0  # 众筹成功项目数量
