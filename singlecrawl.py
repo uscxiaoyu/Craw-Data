@@ -4,9 +4,7 @@ import socket
 import datetime
 import ssl
 import re
-import time
 import json
-import random
 
 context = ssl._create_unverified_context()  # 不验证网页安全性
 socket.setdefaulttimeout(15)  # 设置全局超时
@@ -67,8 +65,11 @@ class Single_proj_craw:
                     post_data = parse.urlencode(post_list)
                     with request.urlopen(req_2, data=post_data.encode('utf-8')) as f_2:
                         self.j_soup = f_2.read().decode()
+                else:
+                    self.category = "重定向"
         except Exception as e:
-            print(f"{self.p_id}网页获取出错: {e}")
+            self.category = "超时"
+            print(f"  网页获取{e}")
 
     def basic_data(self):
         # (1)项目信息
@@ -246,4 +247,4 @@ class Single_proj_craw:
 
 
 if __name__ == "__main__":
-    pass
+    single_craw = Single_proj_craw("107189", 15)

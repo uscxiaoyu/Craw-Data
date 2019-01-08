@@ -21,4 +21,4 @@ print("项目未成功数量:", f_prj.count_documents({"详细信息.状态": '�
 
 
 #%%
-f_prj.find_one()
+f_prj.find_one({}, projection={})

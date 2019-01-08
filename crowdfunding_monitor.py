@@ -1,6 +1,7 @@
 from urllib import request, parse
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
+import socket
 import datetime
 import ssl
 import re
@@ -13,6 +14,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 
 context = ssl._create_unverified_context()  # 不验证网页安全性
+socket.setdefaulttimeout(15)  # 设置全局超时
 
 
 class Single_proj_craw:
@@ -30,36 +32,42 @@ class Single_proj_craw:
         req_1 = request.Request(url_1)
         req_1.add_header('User-Agent', self.User_Agent)
         req_1.add_header('Host', self.Host)
-        with request.urlopen(req_1, context=context) as f_1:
-            self.isDirected = (self.p_id in f_1.geturl())  # 如果p_id不在实际url中，则说明发生了重定向，项目失败
-            if self.isDirected:
-                rawhtml = f_1.read().decode('utf-8')
-                self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
-                cat_div = self.h_soup.find('div', {'class': 'project-img'})
-                l_cat = cat_div.i['class'][0]
-                if l_cat == 'zc-orange-preheat':  # 预热中、众筹中、众筹成功、项目成功
-                    self.category = '预热中'
-                elif l_cat == 'zc-green-ing':
-                    self.category = '众筹中'
-                elif l_cat == 'zc-success':
-                    self.category = '众筹成功'
-                elif l_cat == 'xm-success':
-                    self.category = '项目成功'
+        try:
+            with request.urlopen(req_1, context=context) as f_1:
+                self.isDirected = (self.p_id in f_1.geturl())  # 如果p_id不在实际url中，则说明发生了重定向，项目失败
+                if self.isDirected:
+                    rawhtml = f_1.read().decode('utf-8')
+                    self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
+                    cat_div = self.h_soup.find('div', {'class': 'project-img'})
+                    l_cat = cat_div.i['class'][0]
+                    if l_cat == 'zc-orange-preheat':  # 预热中、众筹中、众筹成功、项目成功
+                        self.category = '预热中'
+                    elif l_cat == 'zc-green-ing':
+                        self.category = '众筹中'
+                    elif l_cat == 'zc-success':
+                        self.category = '众筹成功'
+                    elif l_cat == 'xm-success':
+                        self.category = '项目成功'
 
-                url_2 = 'http://sq.jr.jd.com/cm/getCount?'
-                req_2 = request.Request(url_2)
-                req_2.add_header('User-Agent', self.User_Agent)
-                req_2.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
-                req_2.add_header('Host', self.Host)
-                post_list = [('_', '15242091922'),
-                             ('callback', 'jQuery183000564758012421237_1524209188840'),
-                             ('key', '1000'),
-                             ('pin', ''),
-                             ('systemId', self.p_id),
-                             ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
-                post_data = parse.urlencode(post_list)
-                with request.urlopen(req_2, data=post_data.encode('utf-8')) as f_2:
-                    self.j_soup = f_2.read().decode()
+                    url_2 = 'http://sq.jr.jd.com/cm/getCount?'
+                    req_2 = request.Request(url_2)
+                    req_2.add_header('User-Agent', self.User_Agent)
+                    req_2.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
+                    req_2.add_header('Host', self.Host)
+                    post_list = [('_', '15242091922'),
+                                 ('callback', 'jQuery183000564758012421237_1524209188840'),
+                                 ('key', '1000'),
+                                 ('pin', ''),
+                                 ('systemId', self.p_id),
+                                 ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
+                    post_data = parse.urlencode(post_list)
+                    with request.urlopen(req_2, data=post_data.encode('utf-8')) as f_2:
+                        self.j_soup = f_2.read().decode()
+                else:
+                    self.category = "重定向"
+        except Exception as e:
+            self.category = "超时"
+            print(f"{self.p_id}的网页获取出错: {e}")
 
     def basic_data(self):
         # (1)项目信息
@@ -332,29 +340,28 @@ class Collect_craw:
                                             '$inc': {'爬取次数': 1}},
                                             upsert=True)
                     a += 1
-                else:
-                    if now_category == '预热中':
+                elif now_category == '预热中':
                         s_data = s_craw.start_craw()
                         self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
                                                                         '各档动态信息': s_data['各档动态信息']},
                                                                 '$inc': {'爬取次数': 1}},
                                                 upsert=True)
                         a += 1
-                    elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
-                        self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
-                                                                        '状态变换时间1-2': self.now}},
-                                                upsert=True)
-                        print('  转换为%s状态' % now_category)
-                        a_b += 1
-                    else:
-                        self.project.update_one({'_id': p_id},
-                                                {'$set': {'状态': '众筹失败',
-                                                        '状态变换时间1-2': self.now}},
-                                                upsert=True)
-                        print('众筹失败，不再监测！')
-                        count_fail += 1
+                elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
+                    self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
+                                                                    '状态变换时间1-2': self.now}},
+                                            upsert=True)
+                    print('  转换为%s状态' % now_category)
+                    a_b += 1
+                elif now_category == "重定向":
+                    self.project.update_one({'_id': p_id},
+                                            {'$set': {'状态': '众筹失败',
+                                                    '状态变换时间1-2': self.now}},
+                                            upsert=True)
+                    print('众筹失败，不再监测！')
+                    count_fail += 1
             except Exception as e:
-                print('  {i}, {p_id}  爬取失败！', e)
+                print('  爬取失败！', e)
             i += 1
 
         print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.process_time() - t1))
@@ -391,7 +398,7 @@ class Collect_craw:
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     b_c += 1
-                else:
+                elif now_category == "重定向":
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹未成功',
                                                       '状态变换时间2-3': self.now}},
@@ -419,8 +426,8 @@ class Collect_craw:
                 now_category = s_craw.category
                 print(i, '  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
                 if now_category == '众筹成功':
-                    s_data = s_craw.start_craw()
-                    self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
+                    #s_data = s_craw.start_craw()
+                    #self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
                     c += 1
                 elif now_category == '项目成功':  # 更新为项目成功状态，记录状态变换时间
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
@@ -428,7 +435,7 @@ class Collect_craw:
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     c_d += 1
-                else:
+                elif now_category == "重定向":
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
                                                                      '状态变换时间3-4': self.now}},
                                             upsert=True)
@@ -464,7 +471,7 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
 
 
 if __name__ == '__main__':
-    f = open('/home/yu/Desktop/1.txt')
+    f = open('1.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
 

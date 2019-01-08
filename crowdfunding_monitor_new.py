@@ -94,7 +94,7 @@ class Collect_craw:
             self.failure_project.insert_one({'项目编号': record['_id'], '失败时间': self.now, '详细信息': record})
             self.project.delete_one({'_id': record['_id']})
             print('%s，转移数据！' % record['状态'], 'id: %s ' % record['_id'], '名称: %s ' % record['项目名称'])
-    
+
     def update_orange(self, p_dict):  # 更新预热中项目
         count_fail = 0  # 失败数
         a = 0  # 预热中项目个数
@@ -128,7 +128,7 @@ class Collect_craw:
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     a_b += 1
-                else:
+                elif now_category == "重定向":
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹失败',
                                                       '状态变换时间1-2': self.now}},
@@ -136,10 +136,10 @@ class Collect_craw:
                     print('众筹失败，不再监测！')
                     count_fail += 1
             except Exception as e:
-                print('  {i}, {p_id}  爬取失败！', e)
+                print(f'  爬取失败！', e)
             i += 1
         return a, a_b, count_fail
- 
+
     def update_geen(self, p_dict):  # 更新众筹中项目
         count_fail = 0
         b = 0  # 众筹中项目数量
@@ -169,7 +169,7 @@ class Collect_craw:
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     b_c += 1
-                else:
+                elif now_category == "重定向":
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹未成功',
                                                       '状态变换时间2-3': self.now}},
@@ -178,8 +178,8 @@ class Collect_craw:
                     count_fail += 1
             except Exception as e:
                 print('  爬取失败！', e)
-            return b, b_c, count_fail
-        
+        return b, b_c, count_fail
+
     def update_zcsuc(self, p_dict):  # 更新众筹成功项目
         count_fail = 0
         c = 0  # 众筹成功项目数量
@@ -203,7 +203,7 @@ class Collect_craw:
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     c_d += 1
-                else:
+                elif now_category == "重定向":
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
                                                                     '状态变换时间3-4': self.now}},
                                             upsert=True)
@@ -211,7 +211,7 @@ class Collect_craw:
                     count_fail += 1
             except Exception as e:
                 print('  爬取失败！', e)
-            return c, c_d, count_fail
+        return c, c_d, count_fail
 
     def start_craw(self):
         t = time.process_time()
@@ -230,14 +230,14 @@ class Collect_craw:
         print('===================更新众筹中的项目列表===================')
         t1 = time.process_time()
         b, b_c, b_fail = self.update_geen(p_dict2)
-        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict1)}项, 众筹失败{b_fail}项')
+        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict2)}项, 众筹失败{b_fail}项')
 
         # (3) 更新众筹成功项目信息
         p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
         t1 = time.process_time()
         print('===================更新众筹成功的项目列表===================')
         c, c_d, c_fail = self.update_zcsuc(p_dict3)
-        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict1)}项, 众筹失败{c_fail}项')
+        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict3)}项, 众筹失败{c_fail}项')
 
         # 更新总况
         print('=========================================================')
