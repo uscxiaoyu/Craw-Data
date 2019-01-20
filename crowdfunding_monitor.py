@@ -140,7 +140,7 @@ class Collect_craw:
             i += 1
         return a, a_b, count_fail
 
-    def update_geen(self, p_dict):  # 更新众筹中项目
+    def update_green(self, p_dict):  # 更新众筹中项目
         count_fail = 0
         b = 0  # 众筹中项目数量
         b_c = 0  # 众筹中->众筹成功
@@ -229,7 +229,7 @@ class Collect_craw:
         p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹中的项目列表===================')
         t1 = time.process_time()
-        b, b_c, b_fail = self.update_geen(p_dict2)
+        b, b_c, b_fail = self.update_green(p_dict2)
         print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict2)}项, 众筹失败{b_fail}项')
 
         # (3) 更新众筹成功项目信息
