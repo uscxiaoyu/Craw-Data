@@ -265,7 +265,8 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
 
 
 if __name__ == '__main__':
-    f = open('1.txt')
+    print("开始时间", format(datetime.datetime.now()))
+    f = open('mail_username.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
 
