@@ -1,14 +1,14 @@
+from pymongo import MongoClient
 from urllib import request, parse
 from bs4 import BeautifulSoup
-from pymongo import MongoClient
+from singlecrawl import Single_proj_craw
+import frontpage
 import socket
 import datetime
 import ssl
 import re
 import time
-import json
 import random
-import frontpage
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -17,227 +17,13 @@ context = ssl._create_unverified_context()  # 不验证网页安全性
 socket.setdefaulttimeout(15)  # 设置全局超时
 
 
-class Single_proj_craw:
-
-    def __init__(self, p_id, count_inqury):
-        self.User_Agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:60.0) Gecko/20100101 Firefox/60.0'
-        self.Host = 'z.jd.com'
-        self.p_id = p_id
-        self.count_inqury = count_inqury  # 访问次数
-        self.p_d = re.compile('\d+')
-        self.craw_time = datetime.datetime.now()
-        self.category = False
-
-        url_1 = 'http://z.jd.com/project/details/%s.html' % self.p_id
-        req_1 = request.Request(url_1)
-        req_1.add_header('User-Agent', self.User_Agent)
-        req_1.add_header('Host', self.Host)
-        try:
-            with request.urlopen(req_1, context=context) as f_1:
-                self.isDirected = (self.p_id in f_1.geturl())  # 如果p_id不在实际url中，则说明发生了重定向，项目失败
-                if self.isDirected:
-                    rawhtml = f_1.read().decode('utf-8')
-                    self.h_soup = BeautifulSoup(rawhtml, 'html.parser')
-                    cat_div = self.h_soup.find('div', {'class': 'project-img'})
-                    l_cat = cat_div.i['class'][0]
-                    if l_cat == 'zc-orange-preheat':  # 预热中、众筹中、众筹成功、项目成功
-                        self.category = '预热中'
-                    elif l_cat == 'zc-green-ing':
-                        self.category = '众筹中'
-                    elif l_cat == 'zc-success':
-                        self.category = '众筹成功'
-                    elif l_cat == 'xm-success':
-                        self.category = '项目成功'
-
-                    url_2 = 'http://sq.jr.jd.com/cm/getCount?'
-                    req_2 = request.Request(url_2)
-                    req_2.add_header('User-Agent', self.User_Agent)
-                    req_2.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
-                    req_2.add_header('Host', self.Host)
-                    post_list = [('_', '15242091922'),
-                                 ('callback', 'jQuery183000564758012421237_1524209188840'),
-                                 ('key', '1000'),
-                                 ('pin', ''),
-                                 ('systemId', self.p_id),
-                                 ('temp', '0.29549820811900180')]  # 关键在于systemID，即项目编号
-                    post_data = parse.urlencode(post_list)
-                    with request.urlopen(req_2, data=post_data.encode('utf-8')) as f_2:
-                        self.j_soup = f_2.read().decode()
-                else:
-                    self.category = "重定向"
-        except Exception as e:
-            self.category = "超时"
-            print(f"{self.p_id}的网页获取出错: {e}")
-
-    def basic_data(self):
-        # (1)项目信息
-        div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
-        proj_name = div1.find_all('h1', {'class': 'p-title'})[0].string  # 项目名称
-
-        div1_2 = div1.find_all('p', {'class': "p-target"})[0]
-        time_span = div1_2.find_all('span', {'class': 'f_red'})[0].string.strip()  # 提取截止日期
-        time_span = int(time_span)  # 转化数字格式
-        target_fund = div1_2.find_all('span', {'class': 'f_red'})[1].get_text()[1:]  # 目标金额
-
-        s = self.h_soup.find_all('div', {'class': "tab-share-l"})
-        sort_name = s[0].a['data-attr']  # 项目所属类别
-
-        # (2)发起人信息
-        div2 = self.h_soup.find_all('div', {'class': "promoters-name"})[0]
-        prom_href = div2.find_all('a')[0]['href']  # 发起人href
-        prom_name = div2.find_all('a')[0]['title']  # 发起人名称
-
-        # (3)公司信息
-        company_name, company_address, company_phone, company_hours = None, None, None, None  # 先设为None
-        try:
-            div3 = self.h_soup.find_all('ul', {'class': "contact-box"})[0]
-            div3_li = div3.find_all('li')
-            for li in div3_li:  # 少数项目没有公司名称和联系地址
-                key = li.find('div', {'class': "key"}).contents[1]
-                val = li.find('div', {'class': "val"}).string
-                if key == '公司名称：':
-                    company_name = val  # 公司名称
-                elif key == '联系地址：':
-                    company_address = val  # 联系地址
-                elif key == '官方电话：':
-                    company_phone = val  # 官方电话
-                elif key == '工作时间：':
-                    company_hours = val  # 工作时间
-        except IndexError:
-            print('No company info')
-
-        # (4)各档支持信息
-        div4 = self.h_soup.find_all('div', {'class': "box-grade "})
-        indiv_info = {}
-        for i, d in enumerate(div4):
-            sup_price = d.find_all('div', {'class': "t-price"})[0].span.string.strip()  # 支持价位
-            d_1 = d.find_all('div', {'class': "box-content"})
-            lim_num = d_1[0].find_all('span', {'class': "limit-num"})[0].string  # 限制人数
-            redound_info = d_1[0].find_all('p', {'class': "box-intro"})[0].string.strip()  # 回报内容
-            deliver_info = d_1[0].find_all('p', {'class': "box-item"})[1].get_text()  # 发货时间
-            indiv_info[str(i)] = {'sup_price': int(sup_price),
-                                  'lim_num': lim_num,
-                                  'redound_info': redound_info,
-                                  'deliver_info': deliver_info}
-
-        return {'项目名称': proj_name, '目标金额': int(target_fund), '众筹期限': time_span,
-                '所属类别': sort_name, '发起人链接': prom_href, '发起人名称': prom_name,
-                '公司名称': company_name, '公司地址': company_address, '公司工作时间': company_hours,
-                '公司电话': company_phone, '各档基础信息': indiv_info}
-
-    def update_data(self):
-        # 当前筹集金额、当前进度、当前支持人数
-        div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
-        try:
-            div1_1 = div1.find_all('p', {'class': "p-progress"})[0]
-            now_percent = div1_1.find_all('span', {'class': "fl percent"})[0].string[4:-1]  # 当前进度
-            now_supporters = div1_1.find_all('span', {'class': "fr"})[0].string[:-4]  # 当前支持人数
-            now_fund = div1.find_all('p', {'class': "p-num"})[0].get_text()[1:]  # 当前项目筹集金额
-        except IndexError:
-            now_percent, now_supporters, now_fund = 0, 0, 0
-            print('  项目还未开始众筹！')
-
-        if self.category == '众筹中':  # 获取end_time以决定何时获取review信息
-            div1 = self.h_soup.find_all('div', {'class': 'project-introduce'})[0]
-            div1_2 = div1.find_all('p', {'class': "p-target"})[0]
-            end_time = div1_2.find_all('span', {'class': 'f_red'})[0].string.strip()  # 提取截止日期
-            end_time = '-'.join(self.p_d.findall(end_time))
-            self.end_time = datetime.datetime.strptime(end_time, '%Y-%m-%d')  # 转化截止日期为标准格式
-
-        # 各档支持信息
-        div4 = self.h_soup.find_all('div', {'class': "box-grade "})
-        indiv_info = {'爬取时间': self.craw_time}
-        for i, d in enumerate(div4):
-            now_num_sup = d.find_all('div', {'class': "t-people"})[0].span.string.strip()  # 当前支持人数
-            indiv_info[str(i)] = {'now_num_sup': int(now_num_sup)}
-
-        # 当前点赞人数、当前关注者数、项目创建时间、项目更新时间
-        p_praise = re.compile('"praise":(\d+)')
-        p_focus = re.compile('"focus":(\d+)')
-        p_createTime = re.compile('"createTime":"(\d+-\d+-\d+ \d+:\d+:\d+)"')
-        p_updateTime = re.compile('"updateTime":"(\d+-\d+-\d+ \d+:\d+:\d+)"')
-
-        praise = p_praise.findall(self.j_soup)[0]  # 点赞人数
-        focus = p_focus.findall(self.j_soup)[0]  # 关注人数
-        try:
-            createTime = p_createTime.findall(self.j_soup)[0]
-            createTime = datetime.datetime.strptime(createTime, "%Y-%m-%d %H:%M:%S") # 项目创建时间
-
-            updateTime = p_updateTime.findall(self.j_soup)[0]  # 项目更新时间
-            updateTime = datetime.datetime.strptime(updateTime, "%Y-%m-%d %H:%M:%S") # 项目创建时间
-        except IndexError:
-            createTime = datetime.datetime.now()
-            updateTime = datetime.datetime.now()
-            print('本项目还没有任何点赞和关注！')
-
-        return {'项目动态信息': {'爬取时间': self.craw_time,
-                                '筹集金额': int(now_fund),
-                                '完成百分比': float(now_percent),
-                                '支持者数': int(now_supporters),
-                                '点赞数': int(praise),
-                                '关注数': int(focus),
-                                '创建时间': createTime,
-                                '更新时间': updateTime},
-                 '各档动态信息': indiv_info}
-
-    def review_data(self):
-        url = 'https://sq.jr.jd.com/topic/getTopicList?'
-        req = request.Request(url)
-        req.add_header('User-Agent', self.User_Agent)
-        req.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
-        req.add_header('Host', 'sq.jr.jd.com')
-        reviews = {}
-        i = 1
-        while True:
-            post_list = [('_', '1524311286832'),
-                         ('callback', 'jQuery183036846271396508157_1524311279519'),
-                         ('key', '1000'),
-                         ('pageNo', '%d' % i),
-                         ('pageSize', '20'),
-                         ('serviceType', '1'),
-                         ('sort', '1'),
-                         ('systemId', '%s' % self.p_id),
-                         ('temp', '0.8972247674942638')] # 关键在于systemID，即项目编号
-            post_data = parse.urlencode(post_list)
-            f = request.urlopen(req, data=post_data.encode('utf-8'), context=context)
-            x = f.read().decode()
-            json_x = json.loads(x[x.find('{"listResult"'):-1])
-            pageBean = json_x['pageBean']
-            totalPage = int(pageBean['totalPage'])  # 总页数
-            totalRecord = int(pageBean['totalRecord'])  # 总记录数
-            # 评论id, 创建时间，点赞数，回复数，内容
-            for record in json_x['listResult']:
-                reviews[str(record['topicId'])] = record  # 存储所有评论信息
-            if totalPage > i:
-                i += 1
-            else:
-                break
-
-        return {'爬取时间': self.craw_time, '总页数': totalPage, '总评论数': totalRecord, '评论详细': reviews}
-
-    def start_craw(self):
-        if self.category == '预热中':
-            if self.count_inqury == 0:
-                return self.basic_data(), self.update_data()
-            else:
-                return self.update_data()
-
-        elif self.category == '众筹中':
-            update_dt = self.update_data()
-            if datetime.datetime.now() < self.end_time - datetime.timedelta(hours=12):
-                return update_dt
-            else:
-                return update_dt, self.review_data()
-
-        elif self.category == '众筹成功':
-            return self.review_data()
-
-
 class Collect_craw:
 
     def __init__(self):
         self.User_Agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:60.0) Gecko/20100101 Firefox/60.0'
         self.Host = 'z.jd.com'
+        self.p_url = 'https://z.jd.com/bigger/search.html'
+        self.p_getId = re.compile("\d+")
         # 连接MongoDB数据库
         client = MongoClient('localhost', 27017)
         db = client.moniter_crowdfunding
@@ -256,14 +42,12 @@ class Collect_craw:
         elif category == '项目成功':
             status, class_info, sort = '8', 'info type_xm', 'zxsx'
 
-        p_url = 'https://z.jd.com/bigger/search.html'
-        pattern = re.compile("\d+")
         pid_list = []
         i = 0
         while True:
             time.sleep(0.1)
             len_pid_list = len(pid_list)
-            req = request.Request(p_url)
+            req = request.Request(self.p_url)
             # status: 预热中 '1', 众筹中 '2', 众筹成功 '4' 项目成功 '8'
             post_list = [('categoryId', ''), ('keyword', ''), ('page', '%d' % i), ('parentCategoryId', ''),
                          ('productEnd', '-28'), ('sceneEnd', ''), ('sort', sort), ('status', status)]
@@ -279,7 +63,7 @@ class Collect_craw:
                 li = ul.find_all('li', {'class': class_info})
                 for l in li:
                     url = l.find_all('a')[0].get('href')
-                    pid = pattern.findall(url)[0]
+                    pid = self.p_getId.findall(url)[0]
                     pid_list.append(pid)
 
             i += 1
@@ -311,20 +95,11 @@ class Collect_craw:
             self.project.delete_one({'_id': record['_id']})
             print('%s，转移数据！' % record['状态'], 'id: %s ' % record['_id'], '名称: %s ' % record['项目名称'])
 
-    def start_craw(self):
-        t = time.process_time()
-        print('*********************************************************')
-        print('开始更新', datetime.datetime.now())
-        self.check_new_projs()  # 新增项目，并更新各项目的类别
-        i = 1
+    def update_orange(self, p_dict):  # 更新预热中项目
         count_fail = 0  # 失败数
-        # (1) 更新预热中项目信息
-        p_dict1 = list(self.project.find({'状态': '预热中'}, projection={'_id': True, '爬取次数': True}))
-        print('===================更新预热中的项目列表===================')
         a = 0  # 预热中项目个数
         a_b = 0  # 预热中->众筹中
-        t1 = time.process_time()
-        for proj in p_dict1:
+        for i, proj in enumerate(p_dict, start=1):
             time.sleep(random.random())
             p_id, count_inqury = proj['_id'], proj['爬取次数']
             try:
@@ -335,46 +110,42 @@ class Collect_craw:
                     s_data = s_craw.start_craw()
                     self.project.update_one({'_id': p_id},
                                             {'$set': s_data[0],
-                                            '$push': {'项目动态信息': s_data[1]['项目动态信息'],
-                                                    '各档动态信息': s_data[1]['各档动态信息']},
-                                            '$inc': {'爬取次数': 1}},
+                                             '$push': {'项目动态信息': s_data[1]['项目动态信息'],
+                                                       '各档动态信息': s_data[1]['各档动态信息']},
+                                             '$inc': {'爬取次数': 1}},
                                             upsert=True)
                     a += 1
                 elif now_category == '预热中':
-                        s_data = s_craw.start_craw()
-                        self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
-                                                                        '各档动态信息': s_data['各档动态信息']},
-                                                                '$inc': {'爬取次数': 1}},
-                                                upsert=True)
-                        a += 1
+                    s_data = s_craw.start_craw()
+                    self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
+                                                                      '各档动态信息': s_data['各档动态信息']},
+                                                            '$inc': {'爬取次数': 1}},
+                                            upsert=True)
+                    a += 1
                 elif now_category == '众筹中':  # 更新为众筹中状态，记录状态变换时间
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
-                                                                    '状态变换时间1-2': self.now}},
+                                                                     '状态变换时间1-2': self.now}},
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     a_b += 1
                 elif now_category == "重定向":
                     self.project.update_one({'_id': p_id},
                                             {'$set': {'状态': '众筹失败',
-                                                    '状态变换时间1-2': self.now}},
+                                                      '状态变换时间1-2': self.now}},
                                             upsert=True)
                     print('众筹失败，不再监测！')
                     count_fail += 1
             except Exception as e:
-                print('  爬取失败！', e)
+                print(f'  爬取失败！', e)
             i += 1
+        return a, a_b, count_fail
 
-        print('共 %d 项, 用时 %.2f s' % (len(p_dict1), time.process_time() - t1))
-
-        # (2) 更新众筹中项目信息
-        p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
-        print('===================更新众筹中的项目列表===================')
+    def update_green(self, p_dict):  # 更新众筹中项目
+        count_fail = 0
         b = 0  # 众筹中项目数量
         b_c = 0  # 众筹中->众筹成功
-        t1 = time.process_time()
-        for proj in p_dict2:
+        for i, proj in enumerate(p_dict, start=1):
             time.sleep(random.random())
-            t1 = time.process_time()
             try:
                 p_id, count_inqury = proj['_id'], proj['爬取次数']
                 s_craw = Single_proj_craw(p_id=p_id, count_inqury=count_inqury)
@@ -407,19 +178,14 @@ class Collect_craw:
                     count_fail += 1
             except Exception as e:
                 print('  爬取失败！', e)
-
-            i += 1
-        print('共 %d 项, 用时 %.2f s' % (len(p_dict2), time.process_time() - t1))
-
-        # (3) 更新众筹成功项目信息
-        p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
-        print('===================更新众筹成功的项目列表===================')
+        return b, b_c, count_fail
+        
+    def update_zcsuc(self, p_dict):  # 更新众筹成功项目
+        count_fail = 0
         c = 0  # 众筹成功项目数量
         c_d = 0  # 众筹成功->项目成功
-        t1 = time.process_time()
-        for proj in p_dict3:
+        for i, proj in enumerate(p_dict, start=1):
             time.sleep(random.random())
-            t1 = time.process_time()
             try:
                 p_id, count_inqury = proj['_id'], proj['爬取次数']
                 s_craw = Single_proj_craw(p_id=p_id, count_inqury=count_inqury)
@@ -429,29 +195,57 @@ class Collect_craw:
                     #s_data = s_craw.start_craw()
                     #self.project.update_one({'_id': p_id}, {'$set': {'评论': s_data}, '$inc': {'爬取次数': 1}})
                     c += 1
-                elif now_category == '项目成功':  # 更新为项目成功状态，记录状态变换时间
+                elif now_category == '项目成功':  # 更新为项目成功状态，记录状态变换时间，更新评论信息
+                    s_data = s_craw.start_craw()
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': now_category,
-                                                                     '状态变换时间3-4': self.now}},
+                                                                    '评论': s_data,
+                                                                    '状态变换时间3-4': self.now}},
                                             upsert=True)
                     print('  转换为%s状态' % now_category)
                     c_d += 1
                 elif now_category == "重定向":
                     self.project.update_one({'_id': p_id}, {'$set': {'状态': '项目未成功',
-                                                                     '状态变换时间3-4': self.now}},
+                                                                    '状态变换时间3-4': self.now}},
                                             upsert=True)
                     print('项目未成功，不再监测！')
                     count_fail += 1
             except Exception as e:
                 print('  爬取失败！', e)
+        return c, c_d, count_fail
 
-            i += 1
-        print('共 %d 项, 用时 %.2f s' % (len(p_dict3), time.process_time() - t1))
+    def start_craw(self):
+        t = time.process_time()
+        print('*********************************************************')
+        print('开始更新', datetime.datetime.now())
+        self.check_new_projs()  # 新增项目，并更新各项目的类别
+        # (1) 更新预热中项目信息
+        p_dict1 = list(self.project.find({'状态': '预热中'}, projection={'_id': True, '爬取次数': True}))
+        print('===================更新预热中的项目列表===================')
+        t1 = time.process_time()
+        a, a_b, a_fail = self.update_orange(p_dict1)
+        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict1)}项, 众筹失败{a_fail}项')
+
+        # (2) 更新众筹中项目信息
+        p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
+        print('===================更新众筹中的项目列表===================')
+        t1 = time.process_time()
+        b, b_c, b_fail = self.update_green(p_dict2)
+        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict2)}项, 众筹失败{b_fail}项')
+
+        # (3) 更新众筹成功项目信息
+        p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
+        t1 = time.process_time()
+        print('===================更新众筹成功的项目列表===================')
+        c, c_d, c_fail = self.update_zcsuc(p_dict3)
+        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict3)}项, 众筹失败{c_fail}项')
+
+        # 更新总况
         print('=========================================================')
         print('本次更新结束', datetime.datetime.now())
         print('一共用时: %2.f s' % (time.process_time() - t))
         print('*********************************************************')
 
-        return a, a_b, b, b_c, c, c_d, count_fail
+        return a, a_b, b, b_c, c, c_d, a_fail+b_fail+c_fail
 
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
@@ -471,7 +265,8 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
 
 
 if __name__ == '__main__':
-    f = open('1.txt')
+    print("开始时间", format(datetime.datetime.now()))
+    f = open('mail_username.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
 

@@ -38,9 +38,13 @@ print(detail_x.keys())
 
 #%%
 # 挽回损失
-for x in f_prj.find({"失败时间": {"$gt": datetime.datetime(2019, 1, 8, 16, 0, 0),
-                                 "$lt": datetime.datetime(2018, 1, 8, 15, 30, 0)}},
-                     projection={"项目编号":1, "失败时间":1}):
+rec_cont = list(f_prj.find({"失败时间": {"$gt": datetime.datetime(2019, 1, 8, 16, 0, 0),
+                                 "$lt": datetime.datetime(2019, 1, 8, 18, 30, 0)}}))
+#%%
+for x in rec_cont:
+    print(x["项目编号"])
+#%%
+for x in rec_cont:
     print(x['失败时间'], x['项目编号'])
     detail_x = x["详细信息"]
     if detail_x["状态"] == "众筹失败":
@@ -53,3 +57,22 @@ for x in f_prj.find({"失败时间": {"$gt": datetime.datetime(2019, 1, 8, 16, 0
         m_prj.insert_one(detail_x)
     except Exception as e:
         print("操作失败", e)
+
+#%%
+m_prj.delete_one({"_id": "109256"})
+
+#%%
+for x in rec_cont:
+    if x["项目编号"] == "109256":
+        print(x['失败时间'], x['项目编号'])
+        detail_x = x["详细信息"]
+        if detail_x["状态"] == "众筹失败":
+            detail_x["状态"] = "预热中"
+        elif detail_x["状态"] == "众筹未成功":
+            detail_x["状态"] = "众筹中"
+        elif detail_x["状态"] == "项目未成功":
+            detail_x["状态"] = "众筹成功"
+        try:
+            m_prj.insert_one(detail_x)
+        except Exception as e:
+            print("操作失败", e)
