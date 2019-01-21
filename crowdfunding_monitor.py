@@ -153,7 +153,7 @@ class Collect_craw:
                 print(i, '  编号:', p_id, '第 %d 次监测!' % (count_inqury + 1))
                 if now_category == '众筹中':
                     s_data = s_craw.start_craw()
-                    if datetime.datetime.now() < s_craw.end_time - datetime.timedelta(hours=12):
+                    if datetime.datetime.now() < s_craw.end_time - datetime.timedelta(hours=24):
                         self.project.update_one({'_id': p_id}, {'$push': {'项目动态信息': s_data['项目动态信息'],
                                                                           '各档动态信息': s_data['各档动态信息']},
                                                                 '$inc': {'爬取次数': 1}})
