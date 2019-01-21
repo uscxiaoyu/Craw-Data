@@ -195,8 +195,7 @@ class Single_proj_craw:
         url = 'https://sq.jr.jd.com/topic/getTopicList?'
         req = request.Request(url)
         req.add_header('User-Agent', self.User_Agent)
-        req.add_header(
-            'Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
+        req.add_header('Referer', 'http://z.jd.com/project/details/%s.html' % self.p_id)
         req.add_header('Host', 'sq.jr.jd.com')
         reviews = {}
         i = 1
@@ -236,15 +235,14 @@ class Single_proj_craw:
                 return self.update_data()
 
         elif self.category == '众筹中':
-            update_dt = self.update_data()
             if datetime.datetime.now() < self.end_time - datetime.timedelta(hours=12):
-                return update_dt
+                return self.update_data()
             else:
-                return update_dt, self.review_data()
+                return self.update_data(), self.review_data()
 
-        elif self.category == '众筹成功':
+        elif self.category == '众筹成功' or self.category == "项目成功":
             return self.review_data()
-
+            
 
 if __name__ == "__main__":
     single_craw = Single_proj_craw("107189", 15)
