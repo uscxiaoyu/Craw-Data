@@ -235,10 +235,11 @@ class Single_proj_craw:
                 return self.update_data()
 
         elif self.category == '众筹中':
-            if datetime.datetime.now() < self.end_time - datetime.timedelta(hours=12):
-                return self.update_data()
+            u_data = self.update_data()  # 必须先执行, self.end_time才有值
+            if datetime.datetime.now() < self.end_time - datetime.timedelta(hours=24):
+                return u_data
             else:
-                return self.update_data(), self.review_data()
+                return u_data, self.review_data()
 
         elif self.category == '众筹成功' or self.category == "项目成功":
             return self.review_data()
