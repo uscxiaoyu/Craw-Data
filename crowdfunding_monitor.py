@@ -11,6 +11,7 @@ import re
 import time
 import random
 import smtplib
+import base64
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
@@ -255,14 +256,18 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
-        smtpObj = smtplib.SMTP()
-        smtpObj.connect(mail_host, 25)    # 25 为 SMTP 端口号
+        smtpObj = smtplib.SMTP_SSL(mail_host, 465)
+        smtpObj.ehlo()
+        #smtpObj.connect(mail_host, 465)    # 465 为 SMTP SSL加密 端口号
         smtpObj.login(mail_user, mail_pass)
         smtpObj.sendmail(sender, receiver, message.as_string())
-        print("邮件发送成功!")
+        smtpObj.close()
+        return "Success!"
     except smtplib.SMTPException as e:
         print("Error: 无法发送邮件!")
         print('错误如下:', e)
+        smtpObj.close()
+        return "Failure!"
 
 
 if __name__ == '__main__':
