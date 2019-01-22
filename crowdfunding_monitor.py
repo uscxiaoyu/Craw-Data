@@ -137,7 +137,7 @@ class Collect_craw:
                     print('众筹失败，不再监测！')
                     count_fail += 1
             except Exception as e:
-                print(f'  爬取失败！', e)
+                print('  爬取失败！', e)
             i += 1
         return a, a_b, count_fail
 
@@ -224,21 +224,21 @@ class Collect_craw:
         print('===================更新预热中的项目列表===================')
         t1 = time.process_time()
         a, a_b, a_fail = self.update_orange(p_dict1)
-        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict1)}项, 众筹失败{a_fail}项')
+        print('用时{:.2f}秒\n共{}项, 众筹失败{}项'.format(time.process_time() - t1, len(p_dict1), a_fail))
 
         # (2) 更新众筹中项目信息
         p_dict2 = list(self.project.find({'状态': '众筹中'}, projection={'_id': True, '爬取次数': True}))
         print('===================更新众筹中的项目列表===================')
         t1 = time.process_time()
         b, b_c, b_fail = self.update_green(p_dict2)
-        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict2)}项, 众筹失败{b_fail}项')
+        print('用时{:.2f}秒\n共{}项, 众筹失败{}项'.format(time.process_time() - t1, len(p_dict2), b_fail))
 
         # (3) 更新众筹成功项目信息
         p_dict3 = list(self.project.find({'状态': '众筹成功'}, projection={'_id': True, '爬取次数': True}))
         t1 = time.process_time()
         print('===================更新众筹成功的项目列表===================')
         c, c_d, c_fail = self.update_zcsuc(p_dict3)
-        print(f'用时{time.process_time() - t1:.2f}秒\n共{len(p_dict3)}项, 众筹失败{c_fail}项')
+        print('用时{:.2f}秒\n共{}项, 众筹失败{}项'.format(time.process_time() - t1, len(p_dict3), c_fail))
 
         # 更新总况
         print('=========================================================')

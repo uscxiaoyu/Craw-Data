@@ -69,7 +69,7 @@ class Single_proj_craw:
                     self.category = "重定向"
         except socket.timeout as e:
             self.category = "超时"
-            print(f"  {self.p_id}网页获取出错: {e}")
+            print("  {}网页获取出错: {}".format(self.p_id, e))
 
     def basic_data(self):
         # (1)项目信息
