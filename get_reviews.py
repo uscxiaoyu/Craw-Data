@@ -1,6 +1,6 @@
 #%%
 from pymongo import MongoClient
-from singlecrawl import *
+from singlecrawl import Single_proj_craw
 import datetime
 import time
 # 数据库:名称和容量
