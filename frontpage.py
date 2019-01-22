@@ -13,7 +13,7 @@ class Front_page:
 
     def __init__(self):
         client = MongoClient('localhost', 27017)
-        db = client.moniter_cloudfunding
+        db = client.moniter_crowdfunding  # 出错了
         self.project = db.front_page
         self.pattern = re.compile("\d+")
 
