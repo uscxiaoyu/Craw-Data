@@ -6,7 +6,7 @@ from email.utils import formataddr
 
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Ubuntu-京东众筹', sender])
+    message['From'] = formataddr(['SERVER TEST!', sender])
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
