@@ -252,7 +252,7 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['腾讯云服务器-京东众筹', sender])
+    message['From'] = formataddr(['云服务器-众筹', sender])
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
