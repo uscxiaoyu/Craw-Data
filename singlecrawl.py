@@ -243,7 +243,7 @@ class Single_proj_craw:
 
         elif self.category == '众筹成功' or self.category == "项目成功":
             return self.review_data()
-            
+
 
 if __name__ == "__main__":
     single_craw = Single_proj_craw("107189", 15)
