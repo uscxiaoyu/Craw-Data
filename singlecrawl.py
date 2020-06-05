@@ -169,10 +169,10 @@ class Single_proj_craw:
         praise = self.p_praise.findall(self.j_soup)[0]  # 点赞人数
         focus = self.p_focus.findall(self.j_soup)[0]  # 关注人数
         try:
-            createTime = self.p_createTime.findall(self.j_soup)[0]
+            createTime = int(self.p_createTime.findall(self.j_soup)[0])
             createTime = datetime.datetime.fromtimestamp(createTime/1000)  # 项目创建时间
 
-            updateTime = self.p_updateTime.findall(self.j_soup)[0]  # 项目更新时间
+            updateTime = int(self.p_updateTime.findall(self.j_soup)[0])  # 项目更新时间
             updateTime = datetime.datetime.fromtimestamp(updateTime/1000)  # 项目创建时间
         except IndexError:
             createTime = datetime.datetime.now()
