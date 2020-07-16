@@ -1,6 +1,9 @@
 .idea/
 __pycache__/
 execu.log
+execu2.log
+execu3.log
+nohup.out
 1.txt
 mail_username.txt
 *.ipynb_checkpoints

@@ -252,7 +252,7 @@ class Collect_craw:
 # 发送电子邮件
 def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host='smtp.163.com'):
     message = MIMEText(content, 'plain')
-    message['From'] = formataddr(['Ubuntu-京东众筹', sender])
+    message['From'] = formataddr(['云服务器-众筹', sender])
     message['To'] = formataddr(['QQ', receiver])
     message['Subject'] = title
     try:
@@ -266,13 +266,12 @@ def send_mail(title, content, mail_user, mail_pass, sender, receiver, mail_host=
     except smtplib.SMTPException as e:
         print("Error: 无法发送邮件!")
         print('错误如下:', e)
-        smtpObj.close()
         return "Failure!"
 
 
 if __name__ == '__main__':
     print("开始时间", format(datetime.datetime.now()))
-    f = open('mail_username.txt')
+    f = open('/home/ubuntu/mail_username.txt')
     x = f.read()
     mail_user, mail_pass, sender, receiver = x.strip().split('/')
 

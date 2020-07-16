@@ -9,9 +9,9 @@ print("name                   sizeOnDisk")
 for x in client.list_databases():
     print(f"{x['name']:22}\t{x['sizeOnDisk']/(1024**2):.2f}M")
 #%%
-# client.drop_database("moniter_crowdfunding")
+client.drop_database("moniter_crowdfunding")
 #%%
-get_ipython().system("mongorestore -d moniter_crowdfunding --dir /Users/xiaoyu/Downloads/moniter_crowdfunding")
+get_ipython().system("mongorestore -d moniter_crowdfunding --dir /Users/xiaoyu/Documents/syncmongo/moniter_crowdfunding")
 #%%
 db = client.moniter_crowdfunding
 db.list_collection_names()

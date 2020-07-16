@@ -24,9 +24,9 @@ class Single_proj_craw:
         self.p_praise = re.compile('"praise":(\d+)')
         self.p_focus = re.compile('"focus":(\d+)')
         self.p_createTime = re.compile(
-            '"createTime":"(\d+-\d+-\d+ \d+:\d+:\d+)"')
+            '"createTime":(\d+)')
         self.p_updateTime = re.compile(
-            '"updateTime":"(\d+-\d+-\d+ \d+:\d+:\d+)"')
+            '"updateTime":(\d+)')
         self.p_d = re.compile('\d+')
 
         url_1 = 'http://z.jd.com/project/details/%s.html' % self.p_id
@@ -169,13 +169,11 @@ class Single_proj_craw:
         praise = self.p_praise.findall(self.j_soup)[0]  # 点赞人数
         focus = self.p_focus.findall(self.j_soup)[0]  # 关注人数
         try:
-            createTime = self.p_createTime.findall(self.j_soup)[0]
-            createTime = datetime.datetime.strptime(
-                createTime, "%Y-%m-%d %H:%M:%S")  # 项目创建时间
+            createTime = int(self.p_createTime.findall(self.j_soup)[0])
+            createTime = datetime.datetime.fromtimestamp(createTime/1000)  # 项目创建时间
 
-            updateTime = self.p_updateTime.findall(self.j_soup)[0]  # 项目更新时间
-            updateTime = datetime.datetime.strptime(
-                updateTime, "%Y-%m-%d %H:%M:%S")  # 项目创建时间
+            updateTime = int(self.p_updateTime.findall(self.j_soup)[0])  # 项目更新时间
+            updateTime = datetime.datetime.fromtimestamp(updateTime/1000)  # 项目创建时间
         except IndexError:
             createTime = datetime.datetime.now()
             updateTime = datetime.datetime.now()
@@ -243,7 +241,7 @@ class Single_proj_craw:
 
         elif self.category == '众筹成功' or self.category == "项目成功":
             return self.review_data()
-            
+
 
 if __name__ == "__main__":
     single_craw = Single_proj_craw("107189", 15)
